@@ -98,8 +98,6 @@ cd ..
 
 - [Architecture Guide](docs/ARCHITECTURE.md) - System design and component details
 - [Build Guide](docs/BUILD.md) - Comprehensive build instructions
-- [API Documentation](docs/API.md) - Coming soon
-- [Trading Strategies](docs/STRATEGIES.md) - Coming soon
 
 ## Project Structure
 

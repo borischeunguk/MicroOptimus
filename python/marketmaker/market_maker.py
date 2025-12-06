@@ -129,15 +129,20 @@ class InventoryManager:
                 position.quantity += quantity
                 position.average_price = total_cost / position.quantity if position.quantity > 0 else 0.0
             else:
-                # Reducing short position
+                # Reducing short position (buying back)
                 close_qty = min(quantity, abs(position.quantity))
                 pnl = self._calculate_close_pnl(position.quantity, position.average_price, 
                                                 close_qty, price, is_buy)
                 position.realized_pnl += pnl
                 
-                remaining = quantity - abs(position.quantity)
-                position.quantity = max(0, remaining)
-                position.average_price = price if remaining > 0 else 0.0
+                # Update position: add the buy quantity (moves from negative toward positive)
+                position.quantity += quantity
+                # If we flip to long, set new average price
+                if position.quantity > 0:
+                    position.average_price = price
+                else:
+                    # Still short or flat, keep old avg price if still short
+                    position.average_price = position.average_price if position.quantity < 0 else 0.0
         else:
             # Selling decreases position
             if position.quantity <= 0:
@@ -146,15 +151,20 @@ class InventoryManager:
                 position.quantity -= quantity
                 position.average_price = total_cost / abs(position.quantity) if position.quantity < 0 else 0.0
             else:
-                # Reducing long position
+                # Reducing long position (selling)
                 close_qty = min(quantity, position.quantity)
                 pnl = self._calculate_close_pnl(position.quantity, position.average_price,
                                                 close_qty, price, is_buy)
                 position.realized_pnl += pnl
                 
-                remaining = quantity - position.quantity
-                position.quantity = -max(0, remaining)
-                position.average_price = price if remaining > 0 else 0.0
+                # Update position: subtract the sell quantity (moves from positive toward negative)
+                position.quantity -= quantity
+                # If we flip to short, set new average price
+                if position.quantity < 0:
+                    position.average_price = price
+                else:
+                    # Still long or flat, keep old avg price if still long
+                    position.average_price = position.average_price if position.quantity > 0 else 0.0
 
     def calculate_unrealized_pnl(self, symbol: str, current_price: float):
         """Calculate unrealized P&L"""
