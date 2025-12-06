@@ -36,6 +36,8 @@ Reference:
 lmax disruptor: https://github.com/LMAX-Exchange/disruptor
 
 Aeron: https://github.com/aeron-io
+# Aeron cookbook: https://github.com/aeron-io/aeron-cookbook-code
+# Aeron : https://github.com/aeron-io/aeron
 
 Coral Blocks: https://github.com/coralblocks
 # Coral Me:https://github.com/coralblocks/CoralME
