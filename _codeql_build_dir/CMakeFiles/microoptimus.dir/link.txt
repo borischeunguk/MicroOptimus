@@ -1,0 +1,1 @@
+/home/runner/work/MicroOptimus/.codeql-scratch/dbs/cpp/working/autobuild/bin/c++  -Wall -Wextra -pedantic -O3 -DNDEBUG -Wl,--dependency-file=CMakeFiles/microoptimus.dir/link.d CMakeFiles/microoptimus.dir/cpp/main.cpp.o -o microoptimus  libmatchengine.a liborderbook.a

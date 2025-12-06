@@ -1,0 +1,2 @@
+/usr/bin/ar qc libmatchengine.a CMakeFiles/matchengine.dir/cpp/matchengine/MatchEngine.cpp.o
+/usr/bin/ranlib libmatchengine.a
