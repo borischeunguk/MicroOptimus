@@ -56,4 +56,5 @@ logs/
 config/*.conf
 config/*.yaml
 config/*.json
+!config/example.conf
 !config/*.example.*
