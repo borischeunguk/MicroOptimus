@@ -106,11 +106,22 @@ class InventoryManager:
             )
         return self.positions[symbol]
 
+    def _calculate_close_pnl(self, position_qty: int, avg_price: float, 
+                            fill_qty: int, fill_price: float, is_buy: bool) -> float:
+        """Calculate realized P&L when closing a position"""
+        if is_buy:
+            # Closing short position (buying back)
+            return -fill_qty * (avg_price - fill_price)
+        else:
+            # Closing long position (selling)
+            return fill_qty * (fill_price - avg_price)
+
     def update_position(self, symbol: str, quantity: int, price: float, side: OrderSide):
         """Update position after a trade"""
         position = self.get_position(symbol)
+        is_buy = (side == OrderSide.BUY)
 
-        if side == OrderSide.BUY:
+        if is_buy:
             # Buying increases position
             if position.quantity >= 0:
                 # Adding to long position
@@ -119,18 +130,14 @@ class InventoryManager:
                 position.average_price = total_cost / position.quantity if position.quantity > 0 else 0.0
             else:
                 # Reducing short position
-                if quantity >= abs(position.quantity):
-                    # Closing short and possibly going long
-                    pnl = position.quantity * (position.average_price - price)
-                    position.realized_pnl += pnl
-                    remaining = quantity - abs(position.quantity)
-                    position.quantity = remaining
-                    position.average_price = price if remaining > 0 else 0.0
-                else:
-                    # Partial close
-                    pnl = -quantity * (position.average_price - price)
-                    position.realized_pnl += pnl
-                    position.quantity += quantity
+                close_qty = min(quantity, abs(position.quantity))
+                pnl = self._calculate_close_pnl(position.quantity, position.average_price, 
+                                                close_qty, price, is_buy)
+                position.realized_pnl += pnl
+                
+                remaining = quantity - abs(position.quantity)
+                position.quantity = max(0, remaining)
+                position.average_price = price if remaining > 0 else 0.0
         else:
             # Selling decreases position
             if position.quantity <= 0:
@@ -140,18 +147,14 @@ class InventoryManager:
                 position.average_price = total_cost / abs(position.quantity) if position.quantity < 0 else 0.0
             else:
                 # Reducing long position
-                if quantity >= position.quantity:
-                    # Closing long and possibly going short
-                    pnl = position.quantity * (price - position.average_price)
-                    position.realized_pnl += pnl
-                    remaining = quantity - position.quantity
-                    position.quantity = -remaining
-                    position.average_price = price if remaining > 0 else 0.0
-                else:
-                    # Partial close
-                    pnl = quantity * (price - position.average_price)
-                    position.realized_pnl += pnl
-                    position.quantity -= quantity
+                close_qty = min(quantity, position.quantity)
+                pnl = self._calculate_close_pnl(position.quantity, position.average_price,
+                                                close_qty, price, is_buy)
+                position.realized_pnl += pnl
+                
+                remaining = quantity - position.quantity
+                position.quantity = -max(0, remaining)
+                position.average_price = price if remaining > 0 else 0.0
 
     def calculate_unrealized_pnl(self, symbol: str, current_price: float):
         """Calculate unrealized P&L"""

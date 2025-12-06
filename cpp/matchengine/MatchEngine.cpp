@@ -183,7 +183,10 @@ std::vector<Trade> MatchEngine::executeLimitOrder(std::shared_ptr<Order> order, 
         if (order->remainingQuantity() > 0) {
             order->status = OrderStatus::REJECTED;
             notifyOrderUpdate(*order);
-            // Rollback trades (in production, this would need transaction support)
+            // LIMITATION: This implementation does not rollback already executed trades.
+            // In production, FOK orders require transactional support to ensure atomicity.
+            // Consider checking fill feasibility before execution or implementing proper
+            // transaction rollback mechanisms.
             return std::vector<Trade>();
         }
     }

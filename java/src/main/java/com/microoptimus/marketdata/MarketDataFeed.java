@@ -108,7 +108,10 @@ public class MarketDataFeed {
         }
     }
 
-    private void notifyTrade(String symbol, double price, long quantity, String tradeId) {
+    /**
+     * Update trade information (called by feed connector)
+     */
+    public void updateTrade(String symbol, double price, long quantity, String tradeId) {
         for (MarketDataListener listener : listeners) {
             try {
                 listener.onTrade(symbol, price, quantity, tradeId);
