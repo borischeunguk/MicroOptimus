@@ -28,7 +28,9 @@
 ✅ Reviewed project objectives  
 ✅ Cloned reference repos: LMAX Disruptor, Aeron, CoralME, CoralPool, CoralQueue, CoralRing  
 ✅ Analyzed LMAX Disruptor architecture  
-✅ Analyzed CoralME matching engine
+✅ Analyzed CoralME matching engine  
+✅ Analyzed Aeron messaging system  
+✅ Compared all three technologies
 
 ---
 
@@ -46,10 +48,33 @@
 **Key Techniques:**
 - Power-of-2 sizing, cache-line padding, event pre-allocation, lock-free
 
-**Why Good for MVP:**
-- Single-process ✓
-- Sub-microsecond latency ✓
-- Swap to Aeron later ✓
+**Use Case:** Single-process, inter-thread messaging  
+**Latency:** Sub-microsecond  
+**Phase:** MVP (Phase 1)
+
+---
+
+## Aeron Summary
+
+**What:** Efficient reliable messaging for UDP unicast/multicast and IPC
+
+**Core Capabilities:**
+- Multi-transport (IPC, UDP unicast, UDP multicast)
+- Multi-language (Java, C, C++, .NET)
+- Aeron Archive (durable stream recording/replay)
+- Aeron Cluster (fault-tolerant Raft consensus)
+- SBE integration for fast encoding
+
+**Key Components:**
+- Media Driver (manages transport)
+- Publication/Subscription (producer/consumer)
+- Log Buffers (ring buffer-based)
+- Archive (persistence layer)
+- Cluster (replicated state machines)
+
+**Use Case:** Multi-process, IPC, network, persistence, fault tolerance  
+**Latency:** Microseconds (IPC), milliseconds (network)  
+**Phase:** Standard (Phase 2)
 
 ---
 
@@ -71,11 +96,28 @@
 - LongMap for order lookup
 - Uses CoralPool for zero-GC
 
-**Why Relevant:**
-- Production-ready reference for GC-free order book ✓
-- Clean callback API design ✓
-- Shows CoralBlocks ecosystem patterns ✓
-- Can integrate with Disruptor ✓
+**Use Case:** Order book data structure and matching logic  
+**Latency:** Sub-microsecond (in-memory)  
+**Phase:** Reference for all phases
+
+---
+
+## Technology Comparison
+
+| **Aspect** | **Disruptor** | **Aeron** | **CoralME** |
+|------------|---------------|-----------|-------------|
+| **Purpose** | Inter-thread | Inter-process/network | Order matching |
+| **Scope** | Single JVM | IPC + Network | Library/DS |
+| **Latency** | Sub-μs | μs (IPC), ms (net) | Sub-μs |
+| **GC-Free** | ✅ | ✅ | ✅ |
+| **Persistence** | ❌ | ✅ (Archive) | ❌ |
+| **Fault Tolerance** | ❌ | ✅ (Cluster) | ❌ |
+| **Multi-node** | ❌ | ✅ | ❌ |
+
+**Integration Strategy:**
+- **Phase 1 (MVP):** Disruptor for messaging + CoralME patterns for orderbook
+- **Phase 2 (Standard):** Aeron (IPC/network) + Aeron Archive (persistence) + Aeron Cluster (HA)
+- **Phase 3 (Advanced):** Coral Blocks C++ (CoralRing) + keep Aeron Cluster if needed
 
 ---
 
