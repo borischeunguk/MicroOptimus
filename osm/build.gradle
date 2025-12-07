@@ -8,8 +8,10 @@ description = 'Order State Manager - Orderbook and Matching Engine'
 dependencies {
     implementation project(':common')
 
-    // CoralME patterns reference (optional - for inspiration)
-    // implementation 'com.coralblocks:coralme:1.0.0'
+    // Use CoralME libraries directly for GC-free orderbook
+    implementation files('../CoralME/target/classes')
+    implementation files('../CoralPool/target/classes')
+    implementation fileTree(dir: '../CoralME/lib', include: ['*.jar'])
 }
 
 jmh {

@@ -1,59 +1,93 @@
 package com.microoptimus.osm;
 
-import java.util.ArrayList;
-import java.util.List;
+import com.microoptimus.common.types.OrderType;
+import com.microoptimus.common.types.Side;
+import com.microoptimus.common.types.TimeInForce;
 
 /**
  * MatchingEngine - Matches orders based on price-time priority
+ * Uses CoralME-based OrderBook for GC-free operation
  */
 public class MatchingEngine {
 
     private final OrderBook orderBook;
-    private long executionIdCounter = 0;
 
     public MatchingEngine(OrderBook orderBook) {
         this.orderBook = orderBook;
     }
 
     /**
-     * Match an incoming order against the order book
-     * Returns list of executions (fills)
+     * Process incoming order
+     * Returns the order with updated state
      */
-    public List<Execution> matchOrder(Order order) {
-        List<Execution> executions = new ArrayList<>();
+    public Order processOrder(long orderId, long clientId, Side side, OrderType orderType,
+                             long price, long quantity, TimeInForce tif) {
 
-        // TODO: Implement matching logic
-        // - Match against opposite side
-        // - Price-time priority
-        // - Generate execution events
-
-        return executions;
+        if (orderType == OrderType.MARKET) {
+            return orderBook.addMarketOrder(orderId, clientId, side, quantity);
+        } else {
+            return orderBook.addLimitOrder(orderId, clientId, side, price, quantity, tif);
+        }
     }
 
     /**
-     * Execution represents a trade between two orders
+     * Cancel order by ID
      */
-    public static class Execution {
-        private final long executionId;
-        private final long makerOrderId;
-        private final long takerOrderId;
-        private final long price;
-        private final long quantity;
+    public boolean cancelOrder(long orderId) {
+        return orderBook.cancelOrder(orderId);
+    }
 
-        public Execution(long executionId, long makerOrderId, long takerOrderId,
-                        long price, long quantity) {
-            this.executionId = executionId;
-            this.makerOrderId = makerOrderId;
-            this.takerOrderId = takerOrderId;
-            this.price = price;
-            this.quantity = quantity;
+    /**
+     * Get order by ID
+     */
+    public Order getOrder(long orderId) {
+        return orderBook.getOrder(orderId);
+    }
+
+    /**
+     * Get orderbook reference
+     */
+    public OrderBook getOrderBook() {
+        return orderBook;
+    }
+
+    /**
+     * Get best bid price
+     */
+    public long getBestBidPrice() {
+        return orderBook.getBestBidPrice();
+    }
+
+    /**
+     * Get best ask price
+     */
+    public long getBestAskPrice() {
+        return orderBook.getBestAskPrice();
+    }
+
+    /**
+     * Get spread
+     */
+    public long getSpread() {
+        return orderBook.getSpread();
+    }
+
+    /**
+     * Get book state
+     */
+    public OrderBook.State getState() {
+        return orderBook.getState();
+    }
+
+    /**
+     * Check if order can be matched internally
+     */
+    public boolean hasLiquidity(Side side, long price) {
+        if (side == Side.BUY) {
+            return orderBook.hasAsks() && price >= orderBook.getBestAskPrice();
+        } else {
+            return orderBook.hasBids() && price <= orderBook.getBestBidPrice();
         }
-
-        public long getExecutionId() { return executionId; }
-        public long getMakerOrderId() { return makerOrderId; }
-        public long getTakerOrderId() { return takerOrderId; }
-        public long getPrice() { return price; }
-        public long getQuantity() { return quantity; }
     }
 }
 
