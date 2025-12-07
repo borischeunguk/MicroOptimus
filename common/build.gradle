@@ -1,0 +1,10 @@
+plugins {
+    id 'java-library'
+}
+
+description = 'Common events, types, and utilities'
+
+dependencies {
+    // No additional dependencies - this is the base module
+}
+

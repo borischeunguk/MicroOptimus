@@ -1,0 +1,10 @@
+rootProject.name = 'microoptimus'
+
+include 'common'
+include 'osm'
+include 'liquidator'
+include 'recombinor'
+include 'gateway'
+include 'signal'
+include 'app'
+

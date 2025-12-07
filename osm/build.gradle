@@ -1,0 +1,31 @@
+plugins {
+    id 'java-library'
+    id 'me.champeau.jmh' version '0.7.2'
+}
+
+description = 'Order State Manager - Orderbook and Matching Engine'
+
+dependencies {
+    implementation project(':common')
+
+    // CoralME patterns reference (optional - for inspiration)
+    // implementation 'com.coralblocks:coralme:1.0.0'
+}
+
+jmh {
+    jmhVersion = '1.37'
+    iterations = 3
+    fork = 1
+    warmupIterations = 2
+    threads = 1
+    includes = ['.*Benchmark.*']
+}
+
+sourceSets {
+    jmh {
+        java.srcDirs = ['src/jmh/java']
+        compileClasspath += sourceSets.main.runtimeClasspath
+        runtimeClasspath += sourceSets.main.runtimeClasspath
+    }
+}
+

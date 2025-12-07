@@ -1,0 +1,10 @@
+plugins {
+    id 'java-library'
+}
+
+description = 'Signal - Market Making Strategy (OSM-Signal)'
+
+dependencies {
+    implementation project(':common')
+}
+

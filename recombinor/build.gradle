@@ -1,0 +1,10 @@
+plugins {
+    id 'java-library'
+}
+
+description = 'Recombinor - Market Data Processor'
+
+dependencies {
+    implementation project(':common')
+}
+

@@ -1,0 +1,13 @@
+plugins {
+    id 'java-library'
+}
+
+description = 'Gateway - CME Market Data Connectivity'
+
+dependencies {
+    implementation project(':common')
+
+    // SBE encoding/decoding
+    // implementation 'uk.co.real-logic:sbe-all:1.30.0'
+}
+

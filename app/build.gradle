@@ -1,0 +1,36 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+description = 'Main Application - Wires all modules together'
+
+application {
+    mainClass = 'com.microoptimus.app.MicroOptimusApp'
+}
+
+dependencies {
+    implementation project(':common')
+    implementation project(':osm')
+    implementation project(':liquidator')
+    implementation project(':recombinor')
+    implementation project(':gateway')
+    implementation project(':signal')
+
+    // Thread affinity (optional - for production performance)
+    // implementation 'net.openhft:affinity:3.23.3'
+}
+
+tasks.named('run') {
+    // JVM args for low-latency
+    jvmArgs = [
+        '-XX:+UseG1GC',
+        '-XX:MaxGCPauseMillis=1',
+        '-Xms8g',
+        '-Xmx8g',
+        '-XX:+AlwaysPreTouch',
+        '-XX:+UseStringDeduplication',
+        '-server'
+    ]
+}
+

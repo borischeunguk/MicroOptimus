@@ -1,0 +1,16 @@
+plugins {
+    id 'java-library'
+}
+
+description = 'Liquidator - CME Order Exchange Connectivity'
+
+dependencies {
+    implementation project(':common')
+
+    // FIX protocol support (placeholder - add QuickFIX/J or custom implementation)
+    // implementation 'org.quickfixj:quickfixj-core:2.3.1'
+
+    // SBE encoding/decoding
+    // implementation 'uk.co.real-logic:sbe-all:1.30.0'
+}
+
