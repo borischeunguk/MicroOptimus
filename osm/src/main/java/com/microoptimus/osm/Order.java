@@ -1,64 +1,173 @@
 package com.microoptimus.osm;
 
 import com.microoptimus.common.types.Side;
+import com.microoptimus.common.types.OrderType;
+import com.microoptimus.common.types.TimeInForce;
 
 /**
  * Order - Represents a single order in the order book
- * Pooled for GC-free operation
+ * Pooled for GC-free operation, following CoralME design patterns
  */
 public class Order {
 
+    // Order identifiers
     private long orderId;
+    private long clientId;
     private String symbol;
-    private Side side;
-    private long price;
-    private long quantity;
-    private long filledQuantity;
-    private long timestamp;
 
-    // Linked list pointers for price level
+    // Order attributes
+    private Side side;
+    private OrderType orderType;
+    private long price;
+    private long originalSize;
+    private long executedSize;
+    private TimeInForce timeInForce;
+
+    // Timestamps
+    private long submitTimestamp;
+    private long acceptTimestamp;
+
+    // State
+    private OrderState state;
+    private PriceLevel priceLevel;
+
+    // Intrusive linked list pointers (for PriceLevel)
     Order next;
     Order prev;
 
-    public Order() {
+    public enum OrderState {
+        NEW,           // Created but not yet submitted
+        ACCEPTED,      // Accepted by book
+        PARTIAL_FILL,  // Partially executed
+        FILLED,        // Fully executed
+        CANCELLED,     // Cancelled
+        REJECTED       // Rejected
     }
 
-    public void reset() {
-        this.orderId = 0;
-        this.symbol = null;
-        this.side = null;
-        this.price = 0;
-        this.quantity = 0;
-        this.filledQuantity = 0;
-        this.timestamp = 0;
+    public Order() {
+        this.state = OrderState.NEW;
+    }
+
+    /**
+     * Initialize order with all fields (called when getting from pool)
+     */
+    void init(long orderId, long clientId, String symbol, Side side, OrderType orderType,
+              long price, long size, TimeInForce tif, long submitTimestamp) {
+        this.orderId = orderId;
+        this.clientId = clientId;
+        this.symbol = symbol;
+        this.side = side;
+        this.orderType = orderType;
+        this.price = price;
+        this.originalSize = size;
+        this.executedSize = 0;
+        this.timeInForce = tif;
+        this.submitTimestamp = submitTimestamp;
+        this.acceptTimestamp = -1;
+        this.state = OrderState.NEW;
+        this.priceLevel = null;
         this.next = null;
         this.prev = null;
     }
 
-    // Getters and setters
-    public long getOrderId() { return orderId; }
-    public void setOrderId(long orderId) { this.orderId = orderId; }
-
-    public String getSymbol() { return symbol; }
-    public void setSymbol(String symbol) { this.symbol = symbol; }
-
-    public Side getSide() { return side; }
-    public void setSide(Side side) { this.side = side; }
-
-    public long getPrice() { return price; }
-    public void setPrice(long price) { this.price = price; }
-
-    public long getQuantity() { return quantity; }
-    public void setQuantity(long quantity) { this.quantity = quantity; }
-
-    public long getFilledQuantity() { return filledQuantity; }
-    public void setFilledQuantity(long filledQuantity) { this.filledQuantity = filledQuantity; }
-
-    public long getRemainingQuantity() {
-        return quantity - filledQuantity;
+    /**
+     * Reset order for return to pool (GC-free)
+     */
+    void reset() {
+        this.orderId = 0;
+        this.clientId = 0;
+        this.symbol = null;
+        this.side = null;
+        this.orderType = null;
+        this.price = 0;
+        this.originalSize = 0;
+        this.executedSize = 0;
+        this.timeInForce = null;
+        this.submitTimestamp = 0;
+        this.acceptTimestamp = 0;
+        this.state = OrderState.NEW;
+        this.priceLevel = null;
+        this.next = null;
+        this.prev = null;
     }
 
-    public long getTimestamp() { return timestamp; }
-    public void setTimestamp(long timestamp) { this.timestamp = timestamp; }
+    /**
+     * Execute a quantity of this order
+     */
+    void execute(long quantity) {
+        this.executedSize += quantity;
+        if (this.executedSize >= this.originalSize) {
+            this.state = OrderState.FILLED;
+        } else {
+            this.state = OrderState.PARTIAL_FILL;
+        }
+    }
+
+    /**
+     * Mark order as accepted
+     */
+    void accept() {
+        this.state = OrderState.ACCEPTED;
+        this.acceptTimestamp = System.nanoTime();
+    }
+
+    /**
+     * Mark order as cancelled
+     */
+    void cancel() {
+        this.state = OrderState.CANCELLED;
+    }
+
+    /**
+     * Mark order as rejected
+     */
+    void reject() {
+        this.state = OrderState.REJECTED;
+    }
+
+    // Getters
+    public long getOrderId() { return orderId; }
+    public long getClientId() { return clientId; }
+    public String getSymbol() { return symbol; }
+    public Side getSide() { return side; }
+    public OrderType getOrderType() { return orderType; }
+    public long getPrice() { return price; }
+    public long getOriginalSize() { return originalSize; }
+    public long getExecutedSize() { return executedSize; }
+    public long getRemainingQuantity() { return originalSize - executedSize; }
+    public TimeInForce getTimeInForce() { return timeInForce; }
+    public long getSubmitTimestamp() { return submitTimestamp; }
+    public long getAcceptTimestamp() { return acceptTimestamp; }
+    public OrderState getState() { return state; }
+    public PriceLevel getPriceLevel() { return priceLevel; }
+
+    void setPriceLevel(PriceLevel priceLevel) {
+        this.priceLevel = priceLevel;
+    }
+
+    void setAcceptTimestamp(long timestamp) {
+        this.acceptTimestamp = timestamp;
+    }
+
+    // State queries
+    public boolean isFilled() {
+        return state == OrderState.FILLED;
+    }
+
+    public boolean isTerminal() {
+        return state == OrderState.FILLED ||
+               state == OrderState.CANCELLED ||
+               state == OrderState.REJECTED;
+    }
+
+    public boolean isResting() {
+        return state == OrderState.ACCEPTED || state == OrderState.PARTIAL_FILL;
+    }
+
+    @Override
+    public String toString() {
+        return "Order{id=" + orderId + ", " + side + " " + originalSize +
+               "@" + price + ", exec=" + executedSize + ", state=" + state + "}";
+    }
 }
 

@@ -68,8 +68,14 @@ public class OrderBook {
         this.symbol = symbol;
         this.allowTradeToSelf = allowTradeToSelf;
 
-        // Initialize order pool
-        this.orderPool = new ArrayObjectPool<>(ORDER_POOL_INITIAL_SIZE, Order.class);
+        // Initialize order pool with builder (CoralME pattern)
+        ObjectBuilder<Order> orderBuilder = new ObjectBuilder<Order>() {
+            @Override
+            public Order newInstance() {
+                return new Order();
+            }
+        };
+        this.orderPool = new ArrayObjectPool<>(ORDER_POOL_INITIAL_SIZE, orderBuilder);
 
         // Initialize price level pool with builder
         ObjectBuilder<PriceLevel> priceLevelBuilder = new ObjectBuilder<PriceLevel>() {
@@ -91,12 +97,18 @@ public class OrderBook {
         order.init(orderId, clientId, symbol, side, OrderType.LIMIT,
                   price, quantity, tif, System.nanoTime());
 
-        // Try to match first
+        // Accept order first (CoralME pattern)
+        order.accept();
+
+        // Try to match
         match(order);
 
         // If not filled and not IOC, rest in book
         if (!order.isTerminal() && tif != TimeInForce.IOC) {
             restOrder(order);
+        } else if (tif == TimeInForce.IOC && !order.isFilled()) {
+            // IOC order not fully filled - cancel remaining
+            order.cancel();
         }
 
         return order;
@@ -110,8 +122,16 @@ public class OrderBook {
         order.init(orderId, clientId, symbol, side, OrderType.MARKET,
                   0, quantity, TimeInForce.IOC, System.nanoTime());
 
+        // Accept order first
+        order.accept();
+
         // Match aggressively
         match(order);
+
+        // Cancel any unfilled quantity (market orders don't rest)
+        if (!order.isFilled()) {
+            order.cancel();
+        }
 
         return order;
     }
@@ -125,7 +145,12 @@ public class OrderBook {
             return false;
         }
 
+        // Mark as cancelled
+        order.cancel();
+
+        // Remove from book and return to pool
         removeOrder(order);
+        order.reset();
         orderPool.release(order);
         return true;
     }
