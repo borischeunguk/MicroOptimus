@@ -8,10 +8,8 @@ description = 'Order State Manager - Orderbook and Matching Engine'
 dependencies {
     implementation project(':common')
 
-    // Use CoralME libraries directly for GC-free orderbook
-    implementation files('../CoralME/target/classes')
-    implementation files('../CoralPool/target/classes')
-    implementation fileTree(dir: '../CoralME/lib', include: ['*.jar'])
+    // CoralBlocks dependencies inherited from root build.gradle
+    // No need to redeclare here as they're in subprojects block
 }
 
 jmh {

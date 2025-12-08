@@ -9,6 +9,7 @@ allprojects {
 
     repositories {
         mavenCentral()
+        maven { url 'https://jitpack.io' }
     }
 }
 
@@ -22,6 +23,10 @@ subprojects {
     dependencies {
         // LMAX Disruptor
         implementation 'com.lmax:disruptor:4.0.0'
+
+        // CoralBlocks libraries (via JitPack)
+        implementation 'com.github.coralblocks:CoralPool:1.4.1'
+        implementation 'com.github.coralblocks:CoralME:1.10.2'
 
         // Logging
         implementation 'org.slf4j:slf4j-api:2.0.9'
@@ -70,4 +75,5 @@ task testAll {
     description = 'Test all subprojects'
     group = 'verification'
 }
+
 

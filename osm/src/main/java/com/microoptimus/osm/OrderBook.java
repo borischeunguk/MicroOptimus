@@ -6,7 +6,8 @@ import com.coralblocks.coralpool.ObjectPool;
 import com.microoptimus.common.types.OrderType;
 import com.microoptimus.common.types.Side;
 import com.microoptimus.common.types.TimeInForce;
-import com.microoptimus.osm.util.LongMap;
+import com.coralblocks.coralds.map.LongMap;
+
 
 /**
  * OrderBook - Maintains price levels and orders
