@@ -34,8 +34,8 @@ public class DisruptorApp {
 
     // Configuration
     private static final int RING_BUFFER_SIZE = 2048; // Must be power of 2
-    private static final int WARMUP_EVENTS = 100_000;
-    private static final int MEASUREMENT_EVENTS = 1_000_000;
+    private static final int WARMUP_EVENTS = 1000;
+    private static final int MEASUREMENT_EVENTS = 10_000;
     private static final String SYMBOL = "AAPL";
 
     // Signal strategy parameters
