@@ -1,6 +1,5 @@
 package com.microoptimus.osm;
 
-import com.microoptimus.common.types.OrderType;
 import com.microoptimus.common.types.Side;
 import com.microoptimus.common.types.TimeInForce;
 import org.junit.jupiter.api.BeforeEach;
@@ -68,7 +67,7 @@ class OrderBookTest {
 
         // Buy order should be filled
         assertTrue(buyOrder.isFilled());
-        assertEquals(100L, buyOrder.getFilledQuantity());
+        assertEquals(100L, buyOrder.getExecutedSize());
 
         // Book should be empty now
         assertTrue(orderBook.isEmpty());
@@ -84,7 +83,7 @@ class OrderBookTest {
 
         // Buy order should be partially filled
         assertFalse(buyOrder.isFilled());
-        assertEquals(50L, buyOrder.getFilledQuantity());
+        assertEquals(50L, buyOrder.getExecutedSize());
         assertEquals(50L, buyOrder.getRemainingQuantity());
 
         // Remaining should rest in book
@@ -112,7 +111,7 @@ class OrderBookTest {
 
         // Should be terminal (not resting)
         assertTrue(iocOrder.isTerminal());
-        assertEquals(0L, iocOrder.getFilledQuantity());
+        assertEquals(0L, iocOrder.getExecutedSize());
         assertTrue(orderBook.isEmpty());
     }
 
@@ -146,12 +145,12 @@ class OrderBookTest {
         Order order2 = orderBook.addLimitOrder(2L, 100L, Side.SELL, 15000L, 50L, TimeInForce.DAY);
 
         // Aggressive order should match first order first (time priority)
-        Order buyOrder = orderBook.addMarketOrder(3L, 101L, Side.BUY, 75L);
+        orderBook.addMarketOrder(3L, 101L, Side.BUY, 75L);
 
         // First order should be fully filled
         assertTrue(order1.isFilled());
         // Second order should be partially filled
-        assertEquals(25L, order2.getFilledQuantity());
+        assertEquals(25L, order2.getExecutedSize());
     }
 }
 
