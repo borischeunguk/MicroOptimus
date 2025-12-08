@@ -24,6 +24,9 @@ subprojects {
         // LMAX Disruptor
         implementation 'com.lmax:disruptor:4.0.0'
 
+        // HdrHistogram for latency measurement
+        implementation 'org.hdrhistogram:HdrHistogram:2.1.12'
+
         // CoralBlocks libraries (via JitPack)
         implementation 'com.github.coralblocks:CoralPool:1.4.1'
         implementation 'com.github.coralblocks:CoralME:1.10.2'
@@ -75,5 +78,3 @@ task testAll {
     description = 'Test all subprojects'
     group = 'verification'
 }
-
-
