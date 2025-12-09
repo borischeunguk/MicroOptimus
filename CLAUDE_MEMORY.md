@@ -253,7 +253,10 @@ event.setTimestamp(getTSC());
 ✅ Analyzed LMAX Disruptor architecture  
 ✅ Analyzed CoralME matching engine  
 ✅ Analyzed Aeron messaging system  
-✅ Compared all three technologies
+✅ Compared all three technologies  
+✅ Implemented V1 (LMAX Disruptor 3-stage pipeline)  
+✅ Implemented V2 Prototype (Aeron IPC + Shared Memory Zero-Copy)  
+✅ Implemented V2 Global Sequencer (Aeron Cluster + Shared Memory)
 
 ---
 
@@ -440,7 +443,145 @@ ringBuffer.publish(seq);
 
 ---
 
-### Version 2: Aeron IPC (Inter-Process, Shared Memory)
+### Version 2: Aeron IPC + Shared Memory (Zero-Copy) - IMPLEMENTED
+
+**Status:** ✅ Prototype Complete (Dec 9, 2025)
+
+**Architecture (Zero-Copy Pattern):**
+```
+MDR Process:
+  1. Write MarketData payload to /dev/shm (MappedByteBuffer)
+  2. Send tiny reference message (29 bytes) via Aeron IPC
+     - Contains: slotIndex, slotVersion, timestamp, sequenceId
+  
+MM Process:
+  3. Subscribe to Aeron IPC (receive reference messages)
+  4. Read payload directly from shared memory (zero-copy)
+  5. Process market data
+```
+
+**Key Components:**
+
+1. **SharedMemoryRingBuffer** (`common/shm/`)
+   - Fixed-size slots (128 bytes each, 4096 slots = 512 KB)
+   - Ring buffer pattern (circular, modulo via bitwise AND)
+   - Version-based optimistic locking (detect overwrites)
+   - Layout per slot: [version|eventType|payloadSize|payload]
+   - Uses Agrona UnsafeBuffer for performance
+
+2. **MarketDataReference** (`common/events/aeron/`)
+   - Tiny 29-byte message sent via Aeron
+   - Contains: sequenceId, timestamp, slotIndex, slotVersion, eventType
+   - Fits in single CPU cache line
+
+3. **MarketDataPayload** (`common/events/aeron/`)
+   - 88-byte fixed-size payload in shared memory
+   - Contains: symbol, bidPrice, askPrice, bidSize, askSize, timestamp, seq, bookState
+   - Encoded/decoded with Agrona DirectBuffer
+
+4. **AeronRecombinor** (`recombinor/aeron/`)
+   - Producer: Writes to shared memory + publishes to Aeron
+   - Embedded Media Driver
+   - Generates synthetic market data for testing
+
+5. **AeronSignalHandler** (`signal/aeron/`)
+   - Consumer: Subscribes to Aeron + reads from shared memory
+   - Zero-copy: Direct memory access, no serialization
+   - HDR Histogram for latency measurement
+
+6. **AeronSharedMemoryApp** (`app/aeron/`)
+   - Integration test: MDR → MM flow
+   - Warmup + measurement phases
+   - Latency statistics
+
+**Expected Performance:**
+- Latency: 2-5 μs (MDR → MM)
+- Throughput: > 5M msgs/sec
+- Zero GC (no allocations in hot path)
+
+---
+
+### Version 2: Aeron Cluster (Global Sequencer) - SIMPLIFIED & CORRECTED
+
+**Status:** ✅ Implementation Complete (Dec 9, 2025)
+
+**Architecture (Simplified - Correct Pattern):**
+```
+MDR Process:
+  1. Write full payload to /dev/shm (bestBid, bestAsk, timestamp, venueId)
+  2. Send tiny reference (4 bytes: ID only) to Cluster Ingress
+  
+Aeron Cluster (3 nodes):
+  3. Leader receives reference, sequences it (Raft log ordering)
+  4. NO data manipulation - just forwards reference
+  5. Broadcasts to all consumers via Egress
+  6. Followers automatically replay same ordered log
+  
+MM/OSM Processes:
+  7. Receive globally ordered reference (4 bytes) from Cluster Egress
+  8. Read full payload directly from shared memory (zero-copy!)
+  9. Process in deterministic order
+```
+
+**Key Components:**
+
+1. **SharedMemoryStore** (`common/shm/`)
+   - Simple fixed-entry store (32 bytes per entry)
+   - Direct addressing: id * ENTRY_SIZE
+   - No versioning, no headers - just raw data
+   - writeEntry(id, bid, ask, ts, venue)
+   - readEntry(id) → MarketData
+
+2. **MdRefMessage** (`common/events/aeron/`)
+   - Tiny 4-byte message (just entry ID)
+   - Minimal overhead through cluster
+   - encode(msg, buffer) / decode(buffer)
+
+3. **SequencerService** (`common/cluster/`)
+   - ClusteredService implementation
+   - Receives MD ref on ingress
+   - **Does NOT manipulate data**
+   - Just forwards to egress (cluster handles replication)
+   - Stateless (no sequence counter needed)
+
+4. **MDRProcess** (`recombinor/cluster/`)
+   - Writes full payload to shared memory
+   - Sends 4-byte reference to cluster
+   - Simple and clean
+
+5. **MMProcess** (`signal/cluster/`)
+   - Subscribes to cluster egress (EgressListener)
+   - Receives 4-byte reference
+   - Reads from shared memory (zero-copy)
+   - HDR latency measurement
+
+**Key Insights:**
+- ✅ **Sequencer does NOT read shared memory**
+- ✅ **Sequencer only orders the reference (MD_ID)**
+- ✅ **Followers automatically replay same ordered log**
+- ✅ **Zero serialization, zero copying**
+- ✅ **Deterministic ordering via cluster log**
+
+**Benefits:**
+- ✅ **True Global Sequencer**: Raft consensus, total ordering
+- ✅ **Minimal Overhead**: Only 4 bytes through consensus
+- ✅ **Zero-Copy**: Payloads in shared memory
+- ✅ **Simple**: No data manipulation in sequencer
+- ✅ **Deterministic**: Cluster log guarantees order
+
+**Trade-offs:**
+- ⚠️ **Latency**: 6-11 μs (Raft consensus)
+- ⚠️ **Throughput**: ~100K msgs/sec sustained
+- ⚠️ **Single Machine**: Shared memory = same host only
+
+**Expected Performance:**
+- Latency: 6-11 μs (includes Raft consensus)
+- Throughput: 100K msgs/sec sustained
+- Message Size: 4 bytes through cluster (vs 88+ bytes)
+
+---
+
+### Version 2: Aeron IPC (Inter-Process, Shared Memory) - ORIGINAL PLAN
 
 **Architecture:**
 ```

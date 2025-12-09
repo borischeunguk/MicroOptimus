@@ -5,6 +5,11 @@ plugins {
 description = 'Common events, types, and utilities'
 
 dependencies {
-    // No additional dependencies - this is the base module
+    // Aeron and Agrona for zero-copy messaging
+    api 'io.aeron:aeron-all:1.44.1'
+    api 'org.agrona:agrona:1.21.1'
+
+    // HDR Histogram for latency measurement
+    api 'org.hdrhistogram:HdrHistogram:2.1.12'
 }
 
