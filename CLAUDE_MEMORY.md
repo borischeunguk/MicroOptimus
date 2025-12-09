@@ -1,7 +1,7 @@
 # Claude Session Memory - MicroOptimus Project
 
-**Last Updated:** December 8, 2025  
-**Session:** Implementation Planning - 3 Version Strategy
+**Last Updated:** December 9, 2025  
+**Session:** Implementation Planning - 3 Version Strategy + Tick-to-Trade Flow
 
 ---
 
@@ -22,6 +22,229 @@
 3. **Advanced** - Full C++ with Coral Blocks (<500ns, >30M orders/sec)
 
 ---
+
+## TICK-TO-TRADE FLOW
+
+**End-to-End Target: ~1μs (1,000 nanoseconds)**
+
+### Complete Data Flow Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                  CME MARKET DATA (UDP Multicast)                │
+│                         iLink3 / MDP 3.0                        │
+└────────────────────────────────┬────────────────────────────────┘
+                                 │ Network
+                                 ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      GATEWAY (Market Data)                      │
+│  Thread-1, CPU-0 | C++ UDP Receiver | SBE Decoder              │
+│  - Capture raw UDP packets                                      │
+│  - Decode SBE-encoded market data                               │
+│  - Normalize to internal format                                 │
+│  Latency: ~100ns                                                │
+└────────────────────────────────┬────────────────────────────────┘
+                                 │
+                        [RB-1: MarketDataEvent]
+                                 │ Disruptor/CoralRing
+                                 ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   RECOMBINOR (Market Data Processor)            │
+│  Thread-2, CPU-1 | Java/C++ | Book Reconstruction              │
+│  - Aggregate incremental updates                                │
+│  - Maintain top-of-book (BBO)                                   │
+│  - Detect crosses/locks                                         │
+│  Latency: ~200ns                                                │
+└────────────────────────────────┬────────────────────────────────┘
+                                 │
+                        [RB-2: BookUpdateEvent]
+                                 │
+                    ┌────────────┴────────────┐
+                    │                         │
+                    ▼                         ▼
+┌─────────────────────────────┐   ┌─────────────────────────────┐
+│   OSM (Market State Copy)   │   │   SIGNAL (Market Making)    │
+│   Optional: Passive viewer  │   │   Thread-3, CPU-2           │
+│   For risk/monitoring       │   │   - Strategy logic          │
+└─────────────────────────────┘   │   - Quote generation        │
+                                  │   - Inventory management    │
+                                  │   Latency: ~150ns           │
+                                  └──────────┬──────────────────┘
+                                             │
+                                [RB-3: OrderRequestEvent]
+                                             │ Disruptor/CoralRing
+                                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     OSM (Order & Matching Engine)               │
+│  Thread-4, CPU-3 | Java (MVP) / C++ (Advanced) | **CRITICAL**  │
+│  - Receive order requests                                       │
+│  - Price-time priority matching                                 │
+│  - Generate executions                                          │
+│  - Update internal book state                                   │
+│  Latency: ~200ns                                                │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+            ┌────────────────┼────────────────┐
+            │                │                │
+      [RB-4: Exec]    [RB-5: Exec]    [RB-6: Exec]
+            │                │                │
+            ▼                ▼                ▼
+┌────────────────┐ ┌─────────────┐ ┌──────────────────────────┐
+│  RECOMBINOR    │ │   SIGNAL    │ │     LIQUIDATOR           │
+│  (Book Update) │ │  (Position  │ │  Thread-5, CPU-4         │
+│  Internal book │ │   & P&L)    │ │  - Risk checks           │
+│  reflects exec │ │  Update inv │ │  - FIX/iLink3 encoding   │
+└────────────────┘ └─────────────┘ │  - Route to CME          │
+                                   │  Latency: ~300ns         │
+                                   └──────────┬───────────────┘
+                                              │ Network
+                                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                       CME EXCHANGE (iLink3)                     │
+│                      External Order Gateway                      │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Latency Breakdown (Target)
+
+| **Stage** | **Component** | **Operation** | **Latency** | **Cumulative** |
+|-----------|---------------|---------------|-------------|----------------|
+| 1 | Gateway | UDP capture + SBE decode | 100 ns | 100 ns |
+| 2 | Recombinor | Book reconstruction | 200 ns | 300 ns |
+| 3 | Signal | Strategy logic + quote gen | 150 ns | 450 ns |
+| 4 | OSM | Order matching | 200 ns | 650 ns |
+| 5 | Liquidator | FIX encode + send | 300 ns | 950 ns |
+| **Total** | **Gateway → Exchange** | **Tick-to-Trade** | **~950 ns** | **< 1 μs** |
+
+**Note:** Network latencies not included (Gateway receive, Liquidator send)
+
+---
+
+### Critical Path Analysis
+
+#### Fastest Path (Market Making):
+```
+Market Data → Recombinor → Signal → OSM → Liquidator → CME
+   100ns        200ns       150ns    200ns    300ns    = 950ns
+```
+
+#### Measurement Points:
+
+1. **Gateway Timestamp**: UDP packet arrival (hardware timestamp if available)
+2. **Recombinor Timestamp**: Book update published to RB-2
+3. **Signal Timestamp**: Order request published to RB-3
+4. **OSM Timestamp**: Order accepted, execution generated
+5. **Liquidator Timestamp**: FIX message sent to network
+
+#### Key Optimizations:
+
+- **Thread Affinity**: Pin threads to dedicated CPUs (avoid context switches)
+- **CPU Isolation**: Use `isolcpus` kernel parameter (Linux)
+- **NUMA Awareness**: Keep data on same NUMA node
+- **Busy Spin**: No blocking waits (BusySpinWaitStrategy)
+- **GC-Free**: Object pooling, zero allocation in hot path
+- **Cache Locality**: Sequential memory access, cache-line padding
+- **Lock-Free**: Disruptor sequencer, CoralRing, atomic operations
+
+---
+
+### Ring Buffer Configuration (Version 1: Disruptor)
+
+| **Ring Buffer** | **Producer** | **Consumer** | **Event Type** | **Size** | **Wait Strategy** |
+|-----------------|--------------|--------------|----------------|----------|-------------------|
+| RB-1 | Gateway | Recombinor | MarketDataEvent | 2048 | BusySpin |
+| RB-2 | Recombinor | Signal + OSM | BookUpdateEvent | 2048 | BusySpin |
+| RB-3 | Signal | OSM | OrderRequestEvent | 2048 | BusySpin |
+| RB-4 | OSM | Recombinor | ExecutionEvent | 2048 | BusySpin |
+| RB-5 | OSM | Signal | ExecutionEvent | 2048 | BusySpin |
+| RB-6 | OSM | Liquidator | ExecutionEvent | 2048 | BusySpin |
+
+**Note:** Version 1 uses RB-2 and RB-3 only (simplified MVP)
+
+---
+
+### Thread & CPU Pinning Strategy
+
+```bash
+# Linux: Isolate CPUs 0-7 from kernel scheduler
+isolcpus=0-7 nohz_full=0-7 rcu_nocbs=0-7
+
+# Pin threads to CPUs
+Thread-1 (Gateway)     → CPU 0 (NUMA Node 0)
+Thread-2 (Recombinor)  → CPU 1 (NUMA Node 0)
+Thread-3 (Signal)      → CPU 2 (NUMA Node 0)
+Thread-4 (OSM)         → CPU 3 (NUMA Node 0) ← CRITICAL
+Thread-5 (Liquidator)  → CPU 4 (NUMA Node 0)
+
+# Reserve CPUs 5-7 for other processes (monitoring, logging)
+```
+
+---
+
+### JVM Tuning (Java Components)
+
+```bash
+# Disable GC during trading hours
+-XX:+UnlockExperimentalVMOptions
+-XX:+UseEpsilonGC                    # No-op GC (requires manual heap sizing)
+# OR
+-XX:+UseZGC -XX:ZCollectionInterval=3600  # Minimal GC impact
+
+# JIT compilation
+-XX:+TieredCompilation
+-XX:TieredStopAtLevel=1              # C1 compiler only (faster warmup)
+# OR
+-XX:-TieredCompilation               # C2 only (best performance after warmup)
+
+# NUMA
+-XX:+UseNUMA
+
+# Large pages
+-XX:+UseLargePages
+-XX:LargePageSizeInBytes=2M
+
+# Thread priorities
+-XX:+UseThreadPriorities
+-XX:ThreadPriorityPolicy=1
+```
+
+---
+
+### Performance Targets by Version
+
+| **Version** | **Technology** | **Target Latency** | **Target Throughput** |
+|-------------|----------------|--------------------|-----------------------|
+| V1 (MVP) | LMAX Disruptor (Java) | < 2 μs | > 10M msgs/sec |
+| V2 (Standard) | Aeron IPC (Java) | < 5 μs | > 5M msgs/sec |
+| V3 (Advanced) | CoralRing (C++) | < 500 ns | > 30M msgs/sec |
+
+---
+
+### Monitoring & Metrics
+
+**Real-time Metrics (Captured in Hot Path):**
+- Timestamp at each stage (hardware TSC if available)
+- Queue depth (RingBuffer cursors)
+- Drop count (if any)
+
+**Post-trade Metrics (Logged Off Hot Path):**
+- Latency histograms (HDR Histogram)
+- Percentiles: P50, P95, P99, P99.9, P99.99
+- Throughput per second
+- CPU utilization per thread
+- Memory allocation rate (should be ~0)
+
+**Instrumentation:**
+```java
+// Example: Capture timestamp in event
+event.setTimestamp(System.nanoTime());
+
+// Or hardware timestamp counter
+event.setTimestamp(getTSC());
+```
+
 
 ## Progress Summary
 
