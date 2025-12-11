@@ -14,6 +14,9 @@ PROJECT_DIR="/Users/xinyue/IdeaProjects/MicroOptimus"
 CLASSPATH="$PROJECT_DIR/build/libs/*:$PROJECT_DIR/*/build/libs/*"
 SHM_PATH="/tmp/md_store.bin"
 
+# JVM Arguments for Aeron compatibility
+JVM_ARGS="--add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.util.zip=ALL-UNNAMED -XX:+UseG1GC -Xms1g -Xmx2g"
+
 # Cleanup function
 cleanup() {
     echo ""
@@ -55,7 +58,7 @@ CLUSTER_PIDS=""
 
 for node_id in 0 1 2; do
     echo "Starting cluster node $node_id..."
-    java -cp "$CLASSPATH" com.microoptimus.common.cluster.ClusterNode $node_id > "cluster_node_$node_id.log" 2>&1 &
+    java $JVM_ARGS -cp "$CLASSPATH" com.microoptimus.common.cluster.ClusterNode $node_id > "cluster_node_$node_id.log" 2>&1 &
     pid=$!
     CLUSTER_PIDS="$CLUSTER_PIDS $pid"
     echo "  Node $node_id started (PID: $pid)"
@@ -70,13 +73,13 @@ echo "=== Starting Consumer Processes ==="
 CONSUMER_PIDS=""
 
 echo "Starting MM Process..."
-java -cp "$CLASSPATH" com.microoptimus.signal.cluster.MMProcess > "mm_process.log" 2>&1 &
+java $JVM_ARGS -cp "$CLASSPATH" com.microoptimus.signal.cluster.MMProcess > "mm_process.log" 2>&1 &
 mm_pid=$!
 CONSUMER_PIDS="$CONSUMER_PIDS $mm_pid"
 echo "  MM Process started (PID: $mm_pid)"
 
 echo "Starting OSM Process..."
-java -cp "$CLASSPATH" com.microoptimus.osm.cluster.OSMProcess > "osm_process.log" 2>&1 &
+java $JVM_ARGS -cp "$CLASSPATH" com.microoptimus.osm.cluster.OSMProcess > "osm_process.log" 2>&1 &
 osm_pid=$!
 CONSUMER_PIDS="$CONSUMER_PIDS $osm_pid"
 echo "  OSM Process started (PID: $osm_pid)"
@@ -89,7 +92,7 @@ echo ""
 echo "=== Running Market Data Producer ==="
 echo "Sending 1000 market data events through cluster..."
 
-java -cp "$CLASSPATH" com.microoptimus.recombinor.aeron.AeronRecombinor > "producer.log" 2>&1
+java $JVM_ARGS -cp "$CLASSPATH" com.microoptimus.recombinor.aeron.AeronRecombinor > "producer.log" 2>&1
 
 echo "Producer completed"
 echo ""

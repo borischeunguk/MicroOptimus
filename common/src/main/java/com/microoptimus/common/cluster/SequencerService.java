@@ -64,8 +64,9 @@ public class SequencerService implements ClusteredService {
         long globalSequence = header.position();
 
         // Log periodically for debugging
-        if (globalSequence % 100 == 0) {
-            log.info("SequencerService processed message #{} from session {}", globalSequence, session.id());
+        long sessionId = (session != null) ? session.id() : -1;
+        if (globalSequence % 100 == 0 || globalSequence <= 10) {
+            log.info("SequencerService processed message #{} from session {}", globalSequence, sessionId);
         }
 
         // GLOBAL ORDER: Already guaranteed by Aeron Cluster log sequencing

@@ -22,15 +22,79 @@ dependencies {
 }
 
 tasks.named('run') {
-    // JVM args for low-latency
+    // JVM args for low-latency and Aeron compatibility
     jvmArgs = [
         '-XX:+UseG1GC',
         '-XX:MaxGCPauseMillis=1',
         '-Xms8g',
         '-Xmx8g',
         '-XX:+AlwaysPreTouch',
+        // Aeron compatibility with Java 9+ modules
+        '--add-opens=java.base/sun.nio.ch=ALL-UNNAMED',
+        '--add-opens=java.base/java.nio=ALL-UNNAMED',
+        '--add-opens=java.base/java.lang.reflect=ALL-UNNAMED',
+        '--add-opens=java.base/java.util.zip=ALL-UNNAMED',
         '-XX:+UseStringDeduplication',
         '-server'
     ]
 }
 
+// Add JVM arguments for test tasks
+tasks.withType(Test) {
+    jvmArgs = [
+        // Aeron compatibility with Java 9+ modules
+        '--add-opens=java.base/sun.nio.ch=ALL-UNNAMED',
+        '--add-opens=java.base/java.nio=ALL-UNNAMED',
+        '--add-opens=java.base/java.lang.reflect=ALL-UNNAMED',
+        '--add-opens=java.base/java.util.zip=ALL-UNNAMED',
+        // Performance settings for tests
+        '-XX:+UseG1GC',
+        '-Xms1g',
+        '-Xmx2g'
+    ]
+}
+
+// Create a specific task to run the SimpleAeronClusterTest
+task runClusterTest(type: JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.microoptimus.test.SimpleAeronClusterTest'
+
+    jvmArgs = [
+        // Aeron compatibility with Java 9+ modules
+        '--add-opens=java.base/sun.nio.ch=ALL-UNNAMED',
+        '--add-opens=java.base/java.nio=ALL-UNNAMED',
+        '--add-opens=java.base/java.lang.reflect=ALL-UNNAMED',
+        '--add-opens=java.base/java.util.zip=ALL-UNNAMED',
+        // Performance settings
+        '-XX:+UseG1GC',
+        '-Xms1g',
+        '-Xmx2g',
+        '-server'
+    ]
+
+    // Add system properties for debugging
+    systemProperty 'org.slf4j.simpleLogger.defaultLogLevel', 'info'
+    systemProperty 'aeron.dir', '/tmp/aeron-cluster-test'
+}
+
+// Create a task to run the MinimalClusterTest
+task runMinimalTest(type: JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.microoptimus.test.MinimalClusterTest'
+
+    jvmArgs = [
+        // Aeron compatibility with Java 9+ modules
+        '--add-opens=java.base/sun.nio.ch=ALL-UNNAMED',
+        '--add-opens=java.base/java.nio=ALL-UNNAMED',
+        '--add-opens=java.base/java.lang.reflect=ALL-UNNAMED',
+        '--add-opens=java.base/java.util.zip=ALL-UNNAMED',
+        // Performance settings
+        '-XX:+UseG1GC',
+        '-Xms512m',
+        '-Xmx1g',
+        '-server'
+    ]
+
+    // Add system properties for debugging
+    systemProperty 'org.slf4j.simpleLogger.defaultLogLevel', 'info'
+}

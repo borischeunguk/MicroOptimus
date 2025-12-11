@@ -67,17 +67,30 @@ public class ClusterNode {
                 .clusterMemberId(nodeId)
                 .clusterMembers(clusterMembers)
                 .appointedLeaderId(0)
+                .clusterDir(new java.io.File(System.getProperty("java.io.tmpdir"), "aeron-cluster-" + nodeId))
+                .ingressChannel("aeron:udp?endpoint=localhost:" + (BASE_PORT + nodeId * 100 + 20))
+                .logChannel("aeron:udp?control-mode=manual")
+                .errorHandler(Throwable::printStackTrace);
+
+        // Archive configuration
+        io.aeron.archive.Archive.Context archiveContext = new io.aeron.archive.Archive.Context()
+                .controlChannel("aeron:udp?endpoint=localhost:" + (BASE_PORT + nodeId * 100 + 10))
+                .replicationChannel("aeron:udp?endpoint=localhost:" + (BASE_PORT + nodeId * 100 + 11))
+                .localControlChannel("aeron:ipc")
+                .recordingEventsChannel("aeron:ipc")
+                .archiveDir(new java.io.File(System.getProperty("java.io.tmpdir"), "aeron-archive-" + nodeId))
                 .errorHandler(Throwable::printStackTrace);
 
         // Create clustered media driver
         clusteredMediaDriver = ClusteredMediaDriver.launch(
                 mediaDriverContext,
-                new io.aeron.archive.Archive.Context().controlChannel("aeron:udp?endpoint=localhost:" + (BASE_PORT + nodeId * 100 + 10)),
+                archiveContext,
                 consensusModuleContext);
 
         // Service configuration
         ClusteredServiceContainer.Context serviceContext = new ClusteredServiceContainer.Context()
                 .clusteredService(new SequencerService())
+                .clusterDir(new java.io.File(System.getProperty("java.io.tmpdir"), "aeron-cluster-" + nodeId))
                 .errorHandler(Throwable::printStackTrace);
 
         // Create service container
