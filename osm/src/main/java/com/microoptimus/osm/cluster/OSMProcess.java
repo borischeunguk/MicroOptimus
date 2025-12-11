@@ -61,6 +61,9 @@ public class OSMProcess implements EgressListener {
 
         long receiveTime = System.nanoTime();
 
+        // GLOBAL SEQUENCE: Extract from header.position() - this is our global sequence number
+        long globalSequence = header.position();
+
         // Decode tiny reference (4 bytes)
         MdRefMessage ref = MdRefMessage.decode(buffer, offset);
 
@@ -70,8 +73,8 @@ public class OSMProcess implements EgressListener {
         // Calculate latency (MDR write → OSM read, includes cluster consensus)
         long latency = receiveTime - md.timestamp();
 
-        // Process market data
-        processMarketData(md, latency);
+        // Process market data with global sequence
+        processMarketData(md, globalSequence, latency);
 
         messagesReceived++;
     }
@@ -89,12 +92,14 @@ public class OSMProcess implements EgressListener {
     /**
      * Process market data (update orderbook state)
      */
-    private void processMarketData(SharedMemoryStore.MarketData md, long latency) {
+    private void processMarketData(SharedMemoryStore.MarketData md, long globalSequence, long latency) {
         // TODO: Update internal orderbook with market data
+        // TODO: Use globalSequence for deterministic ordering of operations
 
-        // Log periodically
+        // Log periodically with global sequence number
         if (messagesReceived % 100 == 0) {
-            log.info("OSM got MD #{}: {} | Latency: {} ns", messagesReceived, md, latency);
+            log.info("OSM got MD #{} (seq={}): {} | Latency: {} ns",
+                messagesReceived, globalSequence, md, latency);
         }
     }
 
@@ -131,9 +136,9 @@ public class OSMProcess implements EgressListener {
      * Main method for standalone testing
      */
     public static void main(String[] args) throws Exception {
-        String shmPath = "/dev/shm/md.bin";
-        long shmSize = 128 * 1024 * 1024; // 128 MB
-        String clusterUris = "localhost:20000,localhost:20100,localhost:20200";
+        String shmPath = "/tmp/md_store.bin";
+        long shmSize = 128L * 1024 * 1024; // 128 MB
+        String clusterUris = "localhost:9000,localhost:9001,localhost:9002";
 
         OSMProcess osm = new OSMProcess(shmPath, shmSize, clusterUris);
 

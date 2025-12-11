@@ -60,8 +60,16 @@ public class SequencerService implements ClusteredService {
             int length,
             Header header) {
 
+        // GLOBAL SEQUENCE: Use header.position() as the unique global sequence number
+        long globalSequence = header.position();
+
+        // Log periodically for debugging
+        if (globalSequence % 100 == 0) {
+            log.info("SequencerService processed message #{} from session {}", globalSequence, session.id());
+        }
+
         // GLOBAL ORDER: Already guaranteed by Aeron Cluster log sequencing
-        // Just forward the message to egress for all clients
+        // Forward the message to egress for all clients
         // (Cluster handles replication + sending optimized)
 
         long result = cluster.offer(buffer, offset, length);
