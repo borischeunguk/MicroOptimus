@@ -98,3 +98,25 @@ task runMinimalTest(type: JavaExec) {
     // Add system properties for debugging
     systemProperty 'org.slf4j.simpleLogger.defaultLogLevel', 'info'
 }
+
+// Create a task to run the FullIntegrationTest
+task runFullTest(type: JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.microoptimus.test.FullIntegrationTest'
+
+    jvmArgs = [
+        // Aeron compatibility with Java 9+ modules
+        '--add-opens=java.base/sun.nio.ch=ALL-UNNAMED',
+        '--add-opens=java.base/java.nio=ALL-UNNAMED',
+        '--add-opens=java.base/java.lang.reflect=ALL-UNNAMED',
+        '--add-opens=java.base/java.util.zip=ALL-UNNAMED',
+        // Performance settings
+        '-XX:+UseG1GC',
+        '-Xms512m',
+        '-Xmx1g',
+        '-server'
+    ]
+
+    // Add system properties for debugging
+    systemProperty 'org.slf4j.simpleLogger.defaultLogLevel', 'info'
+}

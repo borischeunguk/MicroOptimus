@@ -49,6 +49,7 @@ public class MMProcess implements EgressListener {
         AeronCluster.Context clusterContext = new AeronCluster.Context()
                 .ingressChannel("aeron:udp")
                 .ingressEndpoints(clusterUris)
+                .egressChannel("aeron:udp?endpoint=localhost:0")
                 .egressListener(this); // Subscribe to egress
 
         this.cluster = AeronCluster.connect(clusterContext);

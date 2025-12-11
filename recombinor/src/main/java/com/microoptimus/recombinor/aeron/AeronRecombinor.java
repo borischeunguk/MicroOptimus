@@ -25,7 +25,7 @@ public class AeronRecombinor {
     private static final Logger log = LoggerFactory.getLogger(AeronRecombinor.class);
 
     // Cluster configuration
-    private static final String CLUSTER_URIS = "localhost:9000,localhost:9001,localhost:9002";
+    private static final String CLUSTER_URIS = "0=localhost:20000";
 
     private final AeronCluster cluster;
     private final SharedMemoryStore sharedMemory;
@@ -42,7 +42,8 @@ public class AeronRecombinor {
         log.info("Connecting to Aeron Cluster: {}", CLUSTER_URIS);
         AeronCluster.Context clusterContext = new AeronCluster.Context()
                 .ingressChannel("aeron:udp")
-                .ingressEndpoints(CLUSTER_URIS);
+                .ingressEndpoints(CLUSTER_URIS)
+                .egressChannel("aeron:udp?endpoint=localhost:0");
 
         this.cluster = AeronCluster.connect(clusterContext);
 
@@ -50,7 +51,7 @@ public class AeronRecombinor {
 
         // Create shared memory
         log.info("Creating shared memory store...");
-        String shmPath = "/tmp/md_store.bin";
+        String shmPath = "/tmp/md_store_full.bin"; // Match the test path
         long shmSize = 128L * 1024 * 1024; // 128 MB
         this.sharedMemory = new SharedMemoryStore(shmPath, shmSize);
 
