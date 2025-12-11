@@ -33,6 +33,7 @@ public class SequencerService implements ClusteredService {
     private static final Logger log = LoggerFactory.getLogger(SequencerService.class);
 
     private Cluster cluster;
+    private final java.util.Set<ClientSession> clientSessions = new java.util.HashSet<>();
 
     @Override
     public void onStart(Cluster cluster, Image snapshotImage) {
@@ -43,12 +44,15 @@ public class SequencerService implements ClusteredService {
 
     @Override
     public void onSessionOpen(ClientSession session, long timestamp) {
-        log.info("Session opened: sessionId={}", session.id());
+        clientSessions.add(session);
+        log.info("Session opened: sessionId={}, total sessions: {}", session.id(), clientSessions.size());
     }
 
     @Override
     public void onSessionClose(ClientSession session, long timestamp, CloseReason closeReason) {
-        log.info("Session closed: sessionId={}, reason={}", session.id(), closeReason);
+        clientSessions.remove(session);
+        log.info("Session closed: sessionId={}, reason={}, remaining sessions: {}",
+                session.id(), closeReason, clientSessions.size());
     }
 
     @Override
@@ -70,13 +74,28 @@ public class SequencerService implements ClusteredService {
         }
 
         // GLOBAL ORDER: Already guaranteed by Aeron Cluster log sequencing
-        // Forward the message to egress for all clients
-        // (Cluster handles replication + sending optimized)
+        // Broadcast the sequenced message to all connected client sessions via egress
 
-        long result = cluster.offer(buffer, offset, length);
+        int successCount = 0;
+        int failureCount = 0;
 
-        if (result < 0) {
-            log.warn("Failed to offer message to cluster: {}", result);
+        for (ClientSession clientSession : clientSessions) {
+            // Send the sequenced message to each client's egress
+            long result = clientSession.offer(buffer, offset, length);
+
+            if (result > 0) {
+                successCount++;
+            } else {
+                failureCount++;
+                if (result != ClientSession.MOCKED_OFFER) {
+                    log.warn("Failed to send to session {}: result={}", clientSession.id(), result);
+                }
+            }
+        }
+
+        if (globalSequence <= 10 || globalSequence % 100 == 0) {
+            log.info("Broadcasted message #{} to {} sessions (success={}, failures={})",
+                    globalSequence, clientSessions.size(), successCount, failureCount);
         }
     }
 
