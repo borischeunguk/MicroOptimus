@@ -305,6 +305,100 @@
 
 ---
 
+## SMART ORDER ROUTER (SOR) IMPLEMENTATION PLAN
+
+**Date:** December 12, 2025  
+**Context:** C++ Smart Order Router in Liquidator module with JNI integration
+
+### Architecture Decision: SOR in LIQUIDATOR Module
+
+**Clear Separation of Concerns:**
+
+**OSM (Order State Manager):**
+- ✅ **Pure Internal Logic**: Orderbook management, internal matching, execution algorithms
+- ✅ **CoralME Design**: GC-free object pooling, intrusive linked lists, sub-microsecond matching
+- ✅ **Order Lifecycle**: NEW → ACCEPTED → PARTIAL_FILL → FILLED
+- ❌ **NO External Routing**: OSM should not know about venues
+
+**LIQUIDATOR (with SOR):**
+- ✅ **Smart Order Routing**: "Where should this order go?" 
+- ✅ **Venue Selection**: CME vs Nasdaq vs NYSE vs back to OSM internal
+- ✅ **Order Splitting**: Large orders across multiple venues
+- ✅ **Risk Management**: Pre-trade risk checks, position limits
+- ✅ **External Protocols**: FIX, SBE, iLink3, OUCH
+- ✅ **C++ Ultra-Low Latency**: Sub-microsecond routing decisions
+
+### Message Flow with SOR
+
+```
+Signal/MM → OSM → LIQUIDATOR/SOR → External Venues
+           ↑              ↓
+    Internal Book    Smart Routing
+    (Pure Matching)  (Venue Selection)
+           ↓
+    Internal Executions
+```
+
+**Detailed Flow:**
+```
+1. Signal/MM generates order → OSM receives order
+2. OSM tries internal matching first (fastest path ~200ns)
+   ├─ Match found → Execute internally → Done ✅
+   └─ No match → Send to LIQUIDATOR/SOR
+3. LIQUIDATOR/SOR (C++ core) makes routing decision (~500ns):
+   ├─ Route to CME (iLink3)
+   ├─ Route to Nasdaq (OUCH) 
+   ├─ Split between venues
+   ├─ Send back to OSM as passive liquidity
+   └─ Reject (risk/invalid)
+4. External venues send execution reports → LIQUIDATOR
+5. LIQUIDATOR aggregates → Reports back to OSM
+6. OSM updates order state → Global sequencer → Signal/MM
+```
+
+### C++ SOR Implementation Components
+
+**1. C++ Ultra-Low Latency Core (Boost + Folly):**
+- **VenueScorer**: Multi-factor venue selection algorithm
+- **RiskManager**: Pre-trade risk checks and position limits  
+- **OrderSplitter**: Intelligent order fragmentation
+- **ProtocolManager**: Venue-specific protocol handling
+
+**2. JNI Integration:**
+- **Native methods**: Sub-microsecond C++ routing calls
+- **Zero-copy buffers**: DirectByteBuffer for high-performance data transfer
+- **Shared memory**: Integration with existing Aeron cluster shared memory
+
+**3. Venue Support:**
+- **Internal**: Route back to OSM for passive liquidity
+- **CME**: Futures/options via iLink3 protocol
+- **Nasdaq**: Equities via OUCH protocol
+- **NYSE**: Equities via FIX protocol
+- **Extensible**: Easy venue addition
+
+### Integration with Global Sequencer + Shared Memory
+
+**Maintains Existing Architecture:**
+```
+MDR → Shared Memory → Cluster → Signal/MM → OSM → LIQUIDATOR/SOR
+                                  ↑                      ↓
+                           Internal Match           External Route
+                              (~200ns)                (~500ns)
+```
+
+**Performance Expectations:**
+- **Internal Path**: OSM internal match → 200ns ✅
+- **External Path**: OSM → SOR → CME → 50μs (CME latency dominates)
+- **SOR Decision**: C++ venue selection → <500ns ✅
+
+### Implementation Status
+- **Phase 1**: C++ SOR framework with JNI → **IN PROGRESS** ⚠️
+- **Phase 2**: Venue-specific protocol implementations
+- **Phase 3**: Integration testing with existing cluster
+- **Phase 4**: Performance optimization and monitoring
+
+---
+
 ### Critical Path Analysis
 
 #### Fastest Path (Market Making):

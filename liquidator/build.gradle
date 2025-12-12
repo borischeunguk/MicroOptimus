@@ -1,8 +1,9 @@
 plugins {
     id 'java-library'
+    id 'application'
 }
 
-description = 'Liquidator - CME Order Exchange Connectivity'
+description = 'Liquidator - Smart Order Router with C++ Ultra-Low Latency Core'
 
 dependencies {
     implementation project(':common')
@@ -12,5 +13,243 @@ dependencies {
 
     // SBE encoding/decoding
     // implementation 'uk.co.real-logic:sbe-all:1.30.0'
+
+    // Test dependencies
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.mockito:mockito-core:4.11.0'
+}
+
+// C++ Smart Order Router compilation using build script
+task compileCppSOR(type: Exec) {
+    description = 'Compile C++ Smart Order Router using build script'
+    group = 'build'
+
+    workingDir "${project.rootDir}"
+
+    // Use the comprehensive build script
+    commandLine 'bash', './build_sor.sh', 'cpp'
+
+    // Environment variables
+    environment 'BUILD_WITH_JNI', 'true'
+    environment 'BUILD_TYPE', 'Release'
+    environment 'USE_FULL_DEPS', project.hasProperty('useFullDeps') ? project.useFullDeps : 'false'
+
+    // Inputs and outputs
+    inputs.files(fileTree("${projectDir}/src/main/cpp") {
+        include "**/*.cpp"
+        include "**/*.h"
+        include "CMakeLists*.txt"
+    })
+    outputs.file("${projectDir}/src/main/cpp/build/sor_perf_test")
+
+    // Optional: also expect JNI library if JNI enabled
+    doLast {
+        def jniLib = file("${projectDir}/src/main/cpp/build/libsmartorderrouter.so")
+        if (jniLib.exists()) {
+            logger.info("JNI library built: ${jniLib}")
+        } else {
+            logger.warn("JNI library not built - Java fallback will be used")
+        }
+    }
+}
+
+// Generate JNI headers
+task generateJNIHeaders(type: Exec) {
+    description = 'Generate JNI headers for C++ compilation'
+    group = 'build'
+    dependsOn compileJava
+
+    workingDir "${projectDir}"
+
+    commandLine 'javac', '-h', 'src/main/cpp',
+                '-classpath', sourceSets.main.compileClasspath.asPath,
+                'src/main/java/com/microoptimus/liquidator/sor/SmartOrderRouter.java'
+
+    outputs.file("${projectDir}/src/main/cpp/com_microoptimus_liquidator_sor_SmartOrderRouter.h")
+}
+
+// Ensure C++ compilation happens after Java compilation
+compileCppSOR.dependsOn generateJNIHeaders
+compileJava.finalizedBy compileCppSOR
+
+// Task to run Smart Order Router test
+task runSORTest(type: JavaExec) {
+    description = 'Run Smart Order Router performance test'
+    group = 'verification'
+    dependsOn classes, compileCppSOR
+
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.microoptimus.liquidator.sor.SmartOrderRouterTest'
+
+    // JVM arguments for performance and JNI
+    jvmArgs = [
+        // Aeron compatibility with Java 9+ modules
+        '--add-opens=java.base/sun.nio.ch=ALL-UNNAMED',
+        '--add-opens=java.base/java.nio=ALL-UNNAMED',
+        '--add-opens=java.base/java.lang.reflect=ALL-UNNAMED',
+        '--add-opens=java.base/java.util.zip=ALL-UNNAMED',
+        // Performance settings for low latency
+        '-XX:+UseG1GC',
+        '-XX:MaxGCPauseMillis=1',
+        '-Xms512m',
+        '-Xmx1g',
+        '-server',
+        // JNI library path
+        "-Djava.library.path=${projectDir}/src/main/cpp/build"
+    ]
+
+    // Set environment for C++ library
+    environment 'LD_LIBRARY_PATH', "${projectDir}/src/main/cpp/build"
+    environment 'DYLD_LIBRARY_PATH', "${projectDir}/src/main/cpp/build" // macOS
+
+    // System properties
+    systemProperty 'org.slf4j.simpleLogger.defaultLogLevel', 'info'
+    systemProperty 'sor.config.path', '/tmp/sor_test.conf'
+    systemProperty 'sor.shared.memory.path', '/tmp/sor_shared_memory.bin'
+}
+
+// Task to run complete SOR build and test
+task testSORComplete(type: Exec) {
+    description = 'Run complete SOR build and test using build script'
+    group = 'verification'
+
+    workingDir "${project.rootDir}"
+    commandLine 'bash', './build_sor.sh', 'test'
+
+    environment 'BUILD_WITH_JNI', 'true'
+    environment 'USE_FULL_DEPS', project.hasProperty('useFullDeps') ? project.useFullDeps : 'false'
+}
+
+// Task to run only C++ tests
+task testSORCpp(type: Exec) {
+    description = 'Run C++ SOR performance test only'
+    group = 'verification'
+
+    workingDir "${project.rootDir}"
+    commandLine 'bash', './build_sor.sh', 'cpp'
+}
+
+// Task to run Java fallback SOR test
+task testSORJavaFallback(type: JavaExec) {
+    description = 'Run Java fallback SOR test (no C++ dependencies)'
+    group = 'verification'
+    dependsOn classes
+
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.microoptimus.liquidator.sor.SmartOrderRouterJavaFallback'
+
+    // Minimal JVM args
+    jvmArgs = [
+        '-Xms128m',
+        '-Xmx256m',
+        '-server'
+    ]
+
+    // System properties
+    systemProperty 'org.slf4j.simpleLogger.defaultLogLevel', 'info'
+}
+
+// Integration with main application
+application {
+    mainClass = 'com.microoptimus.liquidator.sor.SmartOrderRouterTest'
+}
+
+// Task to install C++ dependencies (for development)
+task installCppDependencies(type: Exec) {
+    description = 'Install C++ dependencies (Boost, Folly) - Run manually'
+    group = 'setup'
+
+    commandLine 'bash', '-c', '''
+        echo "Installing C++ dependencies..."
+        
+        # Check if running on macOS or Linux
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            # macOS with Homebrew
+            if command -v brew &> /dev/null; then
+                echo "Installing via Homebrew..."
+                brew install boost folly cmake
+            else
+                echo "Please install Homebrew first: https://brew.sh/"
+                exit 1
+            fi
+        elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+            # Linux (Ubuntu/Debian)
+            if command -v apt-get &> /dev/null; then
+                echo "Installing via apt-get..."
+                sudo apt-get update
+                sudo apt-get install -y libboost-all-dev libfolly-dev cmake build-essential
+            elif command -v yum &> /dev/null; then
+                echo "Installing via yum..."
+                sudo yum install -y boost-devel folly-devel cmake gcc-c++
+            else
+                echo "Please install dependencies manually"
+                exit 1
+            fi
+        else
+            echo "Unsupported OS: $OSTYPE"
+            exit 1
+        fi
+        
+        echo "C++ dependencies installed successfully"
+    '''
+}
+
+// Clean task for C++
+task cleanCpp(type: Delete) {
+    description = 'Clean C++ build artifacts'
+    group = 'build'
+    delete "${projectDir}/src/main/cpp/build"
+    delete fileTree("${projectDir}/src/main/cpp") {
+        include "*.h"  // JNI generated headers
+    }
+}
+
+clean.dependsOn cleanCpp
+
+// Documentation task
+task sorDocumentation(type: Javadoc) {
+    description = 'Generate Smart Order Router documentation'
+    group = 'documentation'
+
+    source = sourceSets.main.allJava
+    include '**/sor/**'
+    classpath = sourceSets.main.compileClasspath
+
+    options {
+        title = 'Smart Order Router API Documentation'
+        author = true
+        version = true
+        windowTitle = 'Smart Order Router'
+    }
+}
+
+// Print build information
+gradle.projectsEvaluated {
+    println """
+    ╔════════════════════════════════════════════════════════════════╗
+    ║                  Smart Order Router Build Info                 ║
+    ╠════════════════════════════════════════════════════════════════╣
+    ║ Module: ${project.name}                                        ║
+    ║ Description: ${project.description}                            ║
+    ║ Java: ${System.getProperty('java.version')}                   ║
+    ║ OS: ${System.getProperty('os.name')} ${System.getProperty('os.arch')} ║
+    ║                                                                ║
+    ║ C++ Features:                                                  ║
+    ║   • Ultra-low latency routing (<500ns target)                 ║
+    ║   • Boost containers for performance                          ║
+    ║   • Folly utilities for Facebook-scale optimization           ║
+    ║   • Multi-factor venue scoring                                ║
+    ║   • Smart order splitting algorithms                          ║
+    ║                                                                ║
+    ║ Integration:                                                   ║
+    ║   • Aeron Cluster global sequencer                           ║
+    ║   • Shared memory zero-copy architecture                     ║
+    ║   • JNI for Java/C++ communication                           ║
+    ║                                                                ║
+    ║ Usage:                                                         ║
+    ║   ./gradlew :liquidator:runSORTest                            ║
+    ║   ./gradlew :liquidator:installCppDependencies                ║
+    ╚════════════════════════════════════════════════════════════════╝
+    """.stripIndent()
 }
 
