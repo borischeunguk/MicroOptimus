@@ -181,7 +181,7 @@ public class SmartOrderRoutingService implements EgressListener {
             long globalSequence = header.position(); // Global sequence from Aeron cluster
 
             // Decode order from buffer
-            OrderRequest order = decodeOrderRequest(buffer, offset, length);
+            SmartOrderRouter.OrderRequest order = decodeOrderRequest(buffer, offset, length);
 
             if (order == null) {
                 log.warn("Failed to decode order from OSM");
@@ -206,7 +206,7 @@ public class SmartOrderRoutingService implements EgressListener {
     /**
      * Handle the routing decision from SOR
      */
-    private void handleRoutingDecision(OrderRequest order,
+    private void handleRoutingDecision(SmartOrderRouter.OrderRequest order,
                                      SmartOrderRouter.RoutingDecision decision,
                                      long globalSequence) {
 
@@ -242,7 +242,7 @@ public class SmartOrderRoutingService implements EgressListener {
     /**
      * Route order back to OSM for internal crossing
      */
-    private void routeBackToOSM(OrderRequest order, SmartOrderRouter.RoutingDecision decision,
+    private void routeBackToOSM(SmartOrderRouter.OrderRequest order, SmartOrderRouter.RoutingDecision decision,
                                long globalSequence) {
         log.debug("Routing order {} back to OSM for internal crossing", order.orderId);
 
@@ -265,7 +265,7 @@ public class SmartOrderRoutingService implements EgressListener {
     /**
      * Route order to external venue
      */
-    private void routeToExternalVenue(OrderRequest order, SmartOrderRouter.RoutingDecision decision,
+    private void routeToExternalVenue(SmartOrderRouter.OrderRequest order, SmartOrderRouter.RoutingDecision decision,
                                     long globalSequence) {
         log.debug("Routing order {} to external venue: {}", order.orderId, decision.primaryVenue);
 
@@ -288,14 +288,14 @@ public class SmartOrderRoutingService implements EgressListener {
     /**
      * Execute split order routing
      */
-    private void executeSplitRouting(OrderRequest order, SmartOrderRouter.RoutingDecision decision,
+    private void executeSplitRouting(SmartOrderRouter.OrderRequest order, SmartOrderRouter.RoutingDecision decision,
                                    long globalSequence) {
         log.debug("Executing split routing for order {} across {} venues",
                  order.orderId, decision.allocations.length);
 
         for (SmartOrderRouter.VenueAllocation allocation : decision.allocations) {
             // Create child order for each allocation
-            OrderRequest childOrder = new OrderRequest(
+            SmartOrderRouter.OrderRequest childOrder = new SmartOrderRouter.OrderRequest(
                 generateChildOrderId(order.orderId, allocation.priority),
                 order.symbol,
                 order.side,
@@ -322,7 +322,7 @@ public class SmartOrderRoutingService implements EgressListener {
     /**
      * Route order to CME
      */
-    private void routeToCME(OrderRequest order, long globalSequence) {
+    private void routeToCME(SmartOrderRouter.OrderRequest order, long globalSequence) {
         try {
             // Convert to CME order format and send
             // TODO: Implement CME-specific order conversion
@@ -354,7 +354,7 @@ public class SmartOrderRoutingService implements EgressListener {
     /**
      * Route order to Nasdaq
      */
-    private void routeToNasdaq(OrderRequest order, long globalSequence) {
+    private void routeToNasdaq(SmartOrderRouter.OrderRequest order, long globalSequence) {
         // TODO: Implement Nasdaq routing
         log.info("Routing order {} to Nasdaq: {} {} {}@{}",
                 order.orderId, order.side, order.symbol, order.quantity, order.price);
@@ -376,7 +376,7 @@ public class SmartOrderRoutingService implements EgressListener {
     /**
      * Route order to NYSE
      */
-    private void routeToNYSE(OrderRequest order, long globalSequence) {
+    private void routeToNYSE(SmartOrderRouter.OrderRequest order, long globalSequence) {
         // TODO: Implement NYSE routing
         log.info("Routing order {} to NYSE: {} {} {}@{}",
                 order.orderId, order.side, order.symbol, order.quantity, order.price);
@@ -398,7 +398,7 @@ public class SmartOrderRoutingService implements EgressListener {
     /**
      * Reject order
      */
-    private void rejectOrder(OrderRequest order, String reason, long globalSequence) {
+    private void rejectOrder(SmartOrderRouter.OrderRequest order, String reason, long globalSequence) {
         log.info("Rejecting order {}: {}", order.orderId, reason);
 
         ExecutionReport execution = new ExecutionReport(
@@ -456,7 +456,7 @@ public class SmartOrderRoutingService implements EgressListener {
 
     // Helper methods
 
-    private OrderRequest decodeOrderRequest(DirectBuffer buffer, int offset, int length) {
+    private SmartOrderRouter.OrderRequest decodeOrderRequest(DirectBuffer buffer, int offset, int length) {
         try {
             // Simple decoding - in practice would use SBE or similar
             ByteBuffer byteBuffer = ByteBuffer.allocate(length);
