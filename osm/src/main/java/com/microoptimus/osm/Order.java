@@ -31,6 +31,9 @@ public class Order {
     private OrderState state;
     private PriceLevel priceLevel;
 
+    // Liquidity source tracking (for internalization priority)
+    private LiquiditySource liquiditySource;
+
     // Intrusive linked list pointers (for PriceLevel)
     Order next;
     Order prev;
@@ -66,8 +69,19 @@ public class Order {
         this.acceptTimestamp = -1;
         this.state = OrderState.NEW;
         this.priceLevel = null;
+        this.liquiditySource = null; // Will be set separately
         this.next = null;
         this.prev = null;
+    }
+
+    /**
+     * Initialize order with liquidity source
+     */
+    void init(long orderId, long clientId, String symbol, Side side, OrderType orderType,
+              long price, long size, TimeInForce tif, long submitTimestamp,
+              LiquiditySource liquiditySource) {
+        init(orderId, clientId, symbol, side, orderType, price, size, tif, submitTimestamp);
+        this.liquiditySource = liquiditySource;
     }
 
     /**
@@ -87,6 +101,7 @@ public class Order {
         this.acceptTimestamp = 0;
         this.state = OrderState.NEW;
         this.priceLevel = null;
+        this.liquiditySource = null;
         this.next = null;
         this.prev = null;
     }
@@ -141,6 +156,10 @@ public class Order {
     public OrderState getState() { return state; }
     public PriceLevel getPriceLevel() { return priceLevel; }
 
+    // Liquidity source methods
+    public LiquiditySource getLiquiditySource() { return liquiditySource; }
+    void setLiquiditySource(LiquiditySource source) { this.liquiditySource = source; }
+
     void setPriceLevel(PriceLevel priceLevel) {
         this.priceLevel = priceLevel;
     }
@@ -170,4 +189,3 @@ public class Order {
                "@" + price + ", exec=" + executedSize + ", state=" + state + "}";
     }
 }
-

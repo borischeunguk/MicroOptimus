@@ -1,12 +1,19 @@
 plugins {
     id 'java-library'
+    id 'application'
     id 'me.champeau.jmh' version '0.7.2'
 }
 
 description = 'Order State Manager - Orderbook and Matching Engine'
 
+// Configure main class for running demos
+application {
+    mainClass = 'com.microoptimus.osm.UnifiedOrderBookDemo'
+}
+
 dependencies {
     implementation project(':common')
+    implementation project(':liquidator')
 
     // CoralBlocks dependencies inherited from root build.gradle
     // No need to redeclare here as they're in subprojects block
@@ -28,4 +35,3 @@ sourceSets {
         runtimeClasspath += sourceSets.main.runtimeClasspath
     }
 }
-
