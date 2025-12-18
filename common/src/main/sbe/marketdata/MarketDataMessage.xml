@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sbe:messageSchema xmlns:sbe="http://fixprotocol.io/2016/sbe"
+                   package="com.microoptimus.common.sbe.marketdata"
+                   id="2"
+                   version="1"
+                   semanticVersion="1.0"
+                   description="Market data messages"
+                   byteOrder="littleEndian">
+
+    <types>
+        <composite name="messageHeader" description="Message identifiers and length of message root">
+            <type name="blockLength" primitiveType="uint16"/>
+            <type name="templateId" primitiveType="uint16"/>
+            <type name="schemaId" primitiveType="uint16"/>
+            <type name="version" primitiveType="uint16"/>
+        </composite>
+
+        <enum name="VenueId" encodingType="uint8">
+            <validValue name="INTERNAL">1</validValue>
+            <validValue name="CME">2</validValue>
+            <validValue name="NASDAQ">3</validValue>
+            <validValue name="NYSE">4</validValue>
+            <validValue name="ARCA">5</validValue>
+            <validValue name="IEX">6</validValue>
+        </enum>
+
+        <enum name="BookState" encodingType="uint8">
+            <validValue name="NORMAL">0</validValue>
+            <validValue name="CROSSED">1</validValue>
+            <validValue name="LOCKED">2</validValue>
+            <validValue name="ONE_SIDED">3</validValue>
+            <validValue name="EMPTY">4</validValue>
+        </enum>
+    </types>
+
+    <sbe:message name="MarketDataSnapshot" id="1" description="Top of book snapshot">
+        <field name="sequenceId" id="1" type="uint64" description="Global sequence"/>
+        <field name="symbol" id="2" type="char" length="16" description="Trading symbol"/>
+        <field name="venue" id="3" type="VenueId" description="Data source venue"/>
+        <field name="timestamp" id="4" type="uint64" description="Market data timestamp"/>
+        <field name="bidPrice" id="5" type="uint64" description="Best bid scaled by 1M"/>
+        <field name="askPrice" id="6" type="uint64" description="Best ask scaled by 1M"/>
+        <field name="bidQty" id="7" type="uint64" description="Bid quantity"/>
+        <field name="askQty" id="8" type="uint64" description="Ask quantity"/>
+        <field name="bookState" id="9" type="BookState" description="Order book state"/>
+    </sbe:message>
+
+    <sbe:message name="VenueTOB" id="2" description="Enhanced venue top-of-book with performance metrics">
+        <field name="venueId" id="1" type="VenueId" description="Venue identifier"/>
+        <field name="symbol" id="2" type="char" length="16" description="Trading symbol"/>
+        <field name="bidPrice" id="3" type="uint64" description="Best bid scaled by 1M"/>
+        <field name="askPrice" id="4" type="uint64" description="Best ask scaled by 1M"/>
+        <field name="bidQty" id="5" type="uint64" description="Bid size"/>
+        <field name="askQty" id="6" type="uint64" description="Ask size"/>
+        <field name="lastUpdateTime" id="7" type="uint64" description="Last update timestamp"/>
+        <field name="avgLatencyNanos" id="8" type="uint64" description="Average execution latency"/>
+        <field name="fillRate" id="9" type="uint32" description="Fill rate scaled by 1M"/>
+        <field name="feesPerShare" id="10" type="uint32" description="Fees per share scaled by 1M"/>
+        <field name="queuePosition" id="11" type="uint32" description="Estimated queue position"/>
+        <field name="totalVolume24h" id="12" type="uint64" description="24h volume"/>
+    </sbe:message>
+
+    <sbe:message name="MarketDataReference" id="3" description="Lightweight reference for shared memory">
+        <field name="sequenceId" id="1" type="uint64" description="Global sequence"/>
+        <field name="timestamp" id="2" type="uint64" description="Creation timestamp"/>
+        <field name="bufferOffset" id="3" type="uint64" description="Offset in shared memory"/>
+        <field name="messageLength" id="4" type="uint32" description="Message length in bytes"/>
+        <field name="messageType" id="5" type="uint8" description="Type of market data message"/>
+    </sbe:message>
+</sbe:messageSchema>

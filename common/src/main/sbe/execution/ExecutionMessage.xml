@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sbe:messageSchema xmlns:sbe="http://fixprotocol.io/2016/sbe"
+                   package="com.microoptimus.common.sbe.execution"
+                   id="3"
+                   version="1"
+                   semanticVersion="1.0"
+                   description="Execution and fill messages"
+                   byteOrder="littleEndian">
+
+    <types>
+        <composite name="messageHeader" description="Message identifiers and length of message root">
+            <type name="blockLength" primitiveType="uint16"/>
+            <type name="templateId" primitiveType="uint16"/>
+            <type name="schemaId" primitiveType="uint16"/>
+            <type name="version" primitiveType="uint16"/>
+        </composite>
+
+        <enum name="ExecType" encodingType="uint8">
+            <validValue name="NEW">0</validValue>
+            <validValue name="PARTIAL_FILL">1</validValue>
+            <validValue name="FILL">2</validValue>
+            <validValue name="CANCELLED">3</validValue>
+            <validValue name="REJECTED">4</validValue>
+        </enum>
+
+        <enum name="VenueId" encodingType="uint8">
+            <validValue name="INTERNAL">1</validValue>
+            <validValue name="CME">2</validValue>
+            <validValue name="NASDAQ">3</validValue>
+            <validValue name="NYSE">4</validValue>
+            <validValue name="ARCA">5</validValue>
+            <validValue name="IEX">6</validValue>
+        </enum>
+    </types>
+
+    <sbe:message name="ExecutionReport" id="1" description="Order execution report">
+        <field name="sequenceId" id="1" type="uint64" description="Global sequence"/>
+        <field name="orderId" id="2" type="uint64" description="Original order ID"/>
+        <field name="execId" id="3" type="uint64" description="Execution ID"/>
+        <field name="symbol" id="4" type="char" length="16" description="Trading symbol"/>
+        <field name="venueId" id="5" type="VenueId" description="Execution venue"/>
+        <field name="execType" id="6" type="ExecType" description="Execution type"/>
+        <field name="execPrice" id="7" type="uint64" description="Execution price scaled by 1M"/>
+        <field name="execQty" id="8" type="uint64" description="Executed quantity"/>
+        <field name="leavesQty" id="9" type="uint64" description="Remaining quantity"/>
+        <field name="cumQty" id="10" type="uint64" description="Cumulative filled"/>
+        <field name="avgPrice" id="11" type="uint64" description="Average fill price scaled by 1M"/>
+        <field name="timestamp" id="12" type="uint64" description="Execution timestamp"/>
+        <field name="latencyNanos" id="13" type="uint64" description="Order to fill latency"/>
+        <field name="fees" id="14" type="uint64" description="Execution fees scaled by 1M"/>
+        <field name="text" id="15" type="char" length="64" description="Execution text"/>
+    </sbe:message>
+
+    <sbe:message name="VenuePerformanceUpdate" id="2" description="Real-time venue performance metrics">
+        <field name="sequenceId" id="1" type="uint64" description="Global sequence"/>
+        <field name="venueId" id="2" type="VenueId" description="Venue identifier"/>
+        <field name="symbol" id="3" type="char" length="16" description="Trading symbol"/>
+        <field name="timestamp" id="4" type="uint64" description="Update timestamp"/>
+        <field name="avgLatencyNanos" id="5" type="uint64" description="Rolling average latency"/>
+        <field name="fillRatePercent" id="6" type="uint32" description="Fill rate percentage * 100"/>
+        <field name="currentFees" id="7" type="uint64" description="Current fees scaled by 1M"/>
+        <field name="queuePosition" id="8" type="uint32" description="Estimated queue position"/>
+        <field name="ordersProcessed" id="9" type="uint64" description="Total orders processed"/>
+        <field name="ordersFilled" id="10" type="uint64" description="Total orders filled"/>
+    </sbe:message>
+
+    <sbe:message name="ExecutionReference" id="3" description="Lightweight execution notification">
+        <field name="sequenceId" id="1" type="uint64" description="Global sequence"/>
+        <field name="orderId" id="2" type="uint64" description="Order ID"/>
+        <field name="execId" id="3" type="uint64" description="Execution ID"/>
+        <field name="bufferOffset" id="4" type="uint64" description="Execution report offset in shared memory"/>
+        <field name="messageLength" id="5" type="uint32" description="Message length in bytes"/>
+        <field name="execType" id="6" type="ExecType" description="Execution type"/>
+    </sbe:message>
+</sbe:messageSchema>

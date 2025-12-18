@@ -2,14 +2,94 @@ plugins {
     id 'java-library'
 }
 
-description = 'Common events, types, and utilities'
+description = 'Common events, types, and utilities with SBE code generation'
+
+configurations {
+    sbe
+}
 
 dependencies {
+    // SBE for zero-copy serialization
+    api 'uk.co.real-logic:sbe-all:1.30.0'
+    sbe 'uk.co.real-logic:sbe-tool:1.30.0'
+
     // Aeron and Agrona for zero-copy messaging
     api 'io.aeron:aeron-all:1.44.1'
     api 'org.agrona:agrona:1.21.1'
 
     // HDR Histogram for latency measurement
     api 'org.hdrhistogram:HdrHistogram:2.1.12'
+
+    // Logging
+    implementation 'org.slf4j:slf4j-api:1.7.36'
+    implementation 'ch.qos.logback:logback-classic:1.2.12'
+
+    // Testing
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.1'
+    testImplementation 'org.junit.jupiter:junit-jupiter-engine:5.10.1'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+// Manual SBE code generation task
+task generateSbe(type: JavaExec) {
+    group = 'SBE'
+    description = 'Generate SBE codecs from schema files'
+
+    classpath configurations.sbe
+    main = 'uk.co.real_logic.sbe.SbeTool'
+
+    def sbeSourceDir = file('src/main/sbe')
+    def sbeTargetDir = file('src/main/java')
+    def sbeCppTargetDir = file('src/main/cpp/generated')
+
+    args = [
+        sbeSourceDir.absolutePath,
+        '--outputDir', sbeTargetDir.absolutePath,
+        '--cppOutputDir', sbeCppTargetDir.absolutePath,
+        '--package', 'com.microoptimus.common.sbe'
+    ]
+
+    inputs.dir sbeSourceDir
+    outputs.dir sbeTargetDir
+    outputs.dir sbeCppTargetDir
+
+    doFirst {
+        sbeTargetDir.mkdirs()
+        sbeCppTargetDir.mkdirs()
+    }
+}
+
+// Generate SBE code before compilation (temporarily disabled)
+// compileJava.dependsOn generateSbe
+
+// Ensure generated source is included in compilation
+sourceSets {
+    main {
+        java {
+            srcDirs += file('src/main/java')
+        }
+    }
+}
+
+// Clean generated files
+clean {
+    delete file('src/main/java/com/microoptimus/common/sbe')
+    delete file('src/main/cpp/generated')
+}
+
+// Test configuration
+test {
+    useJUnitPlatform()
+    testLogging {
+        events "passed", "skipped", "failed"
+        showStandardStreams = true
+    }
+}
+
+// Helper task to print classpath
+task printClasspath {
+    doLast {
+        println configurations.runtimeClasspath.asPath
+    }
 }
 
