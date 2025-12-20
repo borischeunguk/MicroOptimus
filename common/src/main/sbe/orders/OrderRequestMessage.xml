@@ -15,6 +15,13 @@
             <type name="version" primitiveType="uint16"/>
         </composite>
 
+        <composite name="groupSizeEncoding" description="Repeating group dimensions">
+            <type name="blockLength" primitiveType="uint16"/>
+            <type name="numInGroup" primitiveType="uint16"/>
+        </composite>
+
+        <type name="symbol" primitiveType="char" length="16" description="Fixed-length symbol"/>
+
         <enum name="Side" encodingType="uint8">
             <validValue name="BUY">0</validValue>
             <validValue name="SELL">1</validValue>
@@ -55,7 +62,7 @@
     <sbe:message name="OrderRequest" id="1" description="Order routing request for zero-JNI SOR communication">
         <field name="sequenceId" id="1" type="uint64" description="Global sequence from Aeron Cluster"/>
         <field name="orderId" id="2" type="uint64" description="Unique order ID"/>
-        <field name="symbol" id="3" type="char" length="16" description="Trading symbol (e.g. AAPL, MSFT)"/>
+        <field name="symbol" id="3" type="symbol" description="Trading symbol (e.g. AAPL, MSFT)"/>
         <field name="side" id="4" type="Side" description="Buy or Sell"/>
         <field name="orderType" id="5" type="OrderType" description="Market/Limit/Stop"/>
         <field name="price" id="6" type="uint64" description="Price scaled by 1,000,000 (e.g. $15.50 = 15500000)"/>

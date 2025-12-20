@@ -43,19 +43,20 @@ task generateSbe(type: JavaExec) {
     def sbeCppTargetDir = file('src/main/cpp/generated')
 
     args = [
-        sbeSourceDir.absolutePath,
-        '--outputDir', sbeTargetDir.absolutePath,
-        '--cppOutputDir', sbeCppTargetDir.absolutePath,
-        '--package', 'com.microoptimus.common.sbe'
+        file('src/main/sbe/orders/OrderRequestMessage.xml').absolutePath
     ]
+
+    systemProperty 'sbe.output.dir', sbeTargetDir.absolutePath
+    systemProperty 'sbe.java.generate.interfaces', 'true'
 
     inputs.dir sbeSourceDir
     outputs.dir sbeTargetDir
-    outputs.dir sbeCppTargetDir
 
     doFirst {
         sbeTargetDir.mkdirs()
         sbeCppTargetDir.mkdirs()
+        println "Generating SBE code from: ${file('src/main/sbe/orders/OrderRequestMessage.xml').absolutePath}"
+        println "Output directory: ${sbeTargetDir.absolutePath}"
     }
 }
 

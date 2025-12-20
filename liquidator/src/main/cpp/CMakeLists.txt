@@ -77,6 +77,15 @@ target_link_libraries(sor_perf_test
     pthread
 )
 
+# SBE shared memory reader test (reads Java-written SBE messages)
+add_executable(sbe_shm_reader_test
+    test/sbe_shared_memory_reader_test.cpp
+)
+
+target_link_libraries(sbe_shm_reader_test
+    pthread
+)
+
 if(USE_FULL_DEPENDENCIES)
     if(Boost_FOUND)
         target_link_libraries(sor_perf_test ${Boost_LIBRARIES})
