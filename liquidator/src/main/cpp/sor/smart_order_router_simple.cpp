@@ -202,16 +202,35 @@ public:
 
 private:
     double calculateVenueScore(const VenueConfig& config, const OrderRequest& order) {
-        double score = config.priority; // Base priority
+        // VWAP-aware multi-factor scoring
+        double score = 0.0;
 
-        // Latency penalty
-        score -= config.avgLatencyNanos / 1000.0;
+        // 1. Priority weight (40%) - Venue preference
+        score += config.priority * 0.4;
 
-        // Fill rate bonus
-        score += (config.fillRate / 1000000.0) * 50.0;
+        // 2. Latency factor (25%) - Lower latency is better
+        // Internal venue: ~5μs, External: 40-50μs
+        double latencyScore = 100.0 - (config.avgLatencyNanos / 1000.0); // Convert to μs
+        latencyScore = std::max(0.0, latencyScore); // Clamp to positive
+        score += (latencyScore * 0.25);
 
-        // Fee penalty
-        score -= (config.feesPerShare / 1000000.0) * order.quantity * 100.0;
+        // 3. Fill rate factor (20%) - Higher fill rate is better
+        double fillRateScore = (config.fillRate / 10000.0); // Scale to 0-100
+        score += (fillRateScore * 0.20);
+
+        // 4. Fee factor (10%) - Lower fees are better
+        double totalFees = (config.feesPerShare / 1000000.0) * order.quantity;
+        double feeScore = 100.0 - std::min(100.0, totalFees * 10.0);
+        score += (feeScore * 0.10);
+
+        // 5. Capacity factor (5%) - Can venue handle the order?
+        double capacityScore = (order.quantity <= config.maxOrderSize) ? 100.0 : 0.0;
+        score += (capacityScore * 0.05);
+
+        // Internal venue boost: Give preference to internal liquidity
+        if (config.venueType == VenueType::INTERNAL) {
+            score *= 1.2; // 20% boost for internalization
+        }
 
         return score;
     }
@@ -245,13 +264,13 @@ public:
     uint64_t getOrdersRejected() const { return ordersRejected_.load(); }
 };
 
-// Order splitter
+// Order splitter with VWAP-aware allocation
 class OrderSplitter {
 public:
     std::vector<VenueAllocation> splitOrder(
         const OrderRequest& order,
         const std::vector<VenueType>& venues,
-        const VenueScorer& /* scorer */) {
+        const VenueScorer& scorer) {
 
         std::vector<VenueAllocation> allocations;
 
@@ -261,24 +280,51 @@ public:
 
         if (venues.size() == 1) {
             allocations.emplace_back(venues[0], order.quantity, 1);
-        } else {
-            int64_t remainingQuantity = order.quantity;
+            return allocations;
+        }
 
-            for (size_t i = 0; i < venues.size() && remainingQuantity > 0; i++) {
-                int64_t allocation;
-                if (i == venues.size() - 1) {
-                    allocation = remainingQuantity;
-                } else {
-                    double share = 1.0 / (i + 1.5);
-                    allocation = std::min(remainingQuantity,
-                                        (int64_t)(order.quantity * share));
-                }
+        // VWAP-style allocation: prioritize venues by score with capacity limits
+        int64_t remainingQuantity = order.quantity;
+        int priority = 1;
 
-                if (allocation > 0) {
-                    allocations.emplace_back(venues[i], allocation, i + 1);
-                    remainingQuantity -= allocation;
-                }
+        for (const auto& venue : venues) {
+            if (remainingQuantity <= 0) break;
+
+            const VenueConfig* config = scorer.getVenueConfig(venue);
+            if (!config || !config->enabled) continue;
+
+            // Allocate min of: remaining quantity, venue max capacity, or proportional share
+            int64_t venueCapacity = std::min(config->maxOrderSize, remainingQuantity);
+
+            // For first venue (highest score), be more aggressive
+            int64_t allocation;
+            if (priority == 1) {
+                // Best venue gets larger share
+                allocation = std::min(venueCapacity, (remainingQuantity * 40) / 100);
+            } else if (priority == 2) {
+                // Second venue gets medium share
+                allocation = std::min(venueCapacity, (remainingQuantity * 30) / 100);
+            } else {
+                // Remaining venues split the rest
+                int64_t remainingVenues = venues.size() - priority + 1;
+                allocation = std::min(venueCapacity, remainingQuantity / remainingVenues);
             }
+
+            // Ensure we allocate something if there's remaining quantity
+            if (allocation == 0 && remainingQuantity > 0) {
+                allocation = std::min(venueCapacity, remainingQuantity);
+            }
+
+            if (allocation > 0) {
+                allocations.emplace_back(venue, allocation, priority);
+                remainingQuantity -= allocation;
+                priority++;
+            }
+        }
+
+        // If still have remaining quantity, add to last allocation
+        if (remainingQuantity > 0 && !allocations.empty()) {
+            allocations.back().quantity += remainingQuantity;
         }
 
         return allocations;
@@ -501,7 +547,120 @@ Java_com_microoptimus_liquidator_sor_SmartOrderRouter_initializeNative(
     }
 }
 
-// Additional JNI methods would go here...
+JNIEXPORT jint JNICALL
+Java_com_microoptimus_liquidator_sor_VWAPSmartOrderRouter_initializeNative(
+    JNIEnv* env, jobject /* obj */, jstring configPath, jstring sharedMemoryPath) {
+
+    try {
+        if (!g_smartOrderRouter) {
+            g_smartOrderRouter = std::make_unique<SmartOrderRouter>();
+        }
+
+        const char* configPathStr = env->GetStringUTFChars(configPath, nullptr);
+        const char* shmPathStr = env->GetStringUTFChars(sharedMemoryPath, nullptr);
+
+        int result = g_smartOrderRouter->initialize(
+            std::string(configPathStr),
+            std::string(shmPathStr)
+        );
+
+        env->ReleaseStringUTFChars(configPath, configPathStr);
+        env->ReleaseStringUTFChars(sharedMemoryPath, shmPathStr);
+
+        return result;
+
+    } catch (const std::exception& e) {
+        return -1;
+    }
+}
+
+JNIEXPORT jint JNICALL
+Java_com_microoptimus_liquidator_sor_VWAPSmartOrderRouter_routeVWAPSliceNative(
+    JNIEnv* env, jobject /* obj */,
+    jlong sliceId, jlong totalOrderId, jstring symbol, jint side,
+    jlong sliceQuantity, jlong limitPrice, jlong maxLatencyNanos,
+    jint urgencyLevel, jobject resultBuffer) {
+
+    try {
+        if (!g_smartOrderRouter) {
+            return -1;
+        }
+
+        // Convert Java string to C++ string
+        const char* symbolStr = env->GetStringUTFChars(symbol, nullptr);
+        std::string symbolCpp(symbolStr);
+        env->ReleaseStringUTFChars(symbol, symbolStr);
+
+        // Create order request from VWAP slice parameters
+        OrderRequest order(
+            sliceId,
+            symbolCpp,
+            static_cast<Side>(side),
+            OrderType::LIMIT,
+            limitPrice,
+            sliceQuantity,
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::high_resolution_clock::now().time_since_epoch()
+            ).count()
+        );
+
+        // Route the order using enhanced VWAP-aware logic
+        RoutingDecision decision = g_smartOrderRouter->routeOrder(order);
+
+        // Get direct buffer pointer
+        void* bufferPtr = env->GetDirectBufferAddress(resultBuffer);
+        if (!bufferPtr) {
+            return -2;
+        }
+
+        // Write result to buffer
+        int32_t* intBuf = static_cast<int32_t*>(bufferPtr);
+        int64_t* longBuf = reinterpret_cast<int64_t*>(intBuf + 2);
+
+        // Write action and primary venue
+        intBuf[0] = static_cast<int32_t>(decision.action);
+        intBuf[1] = static_cast<int32_t>(decision.primaryVenue);
+
+        // Write total quantity and estimated fill time
+        longBuf[1] = decision.quantity;
+        longBuf[2] = decision.estimatedFillTimeNanos;
+
+        // Write allocations if split order
+        if (decision.action == RoutingAction::SPLIT_ORDER && !decision.allocations.empty()) {
+            intBuf[12] = static_cast<int32_t>(decision.allocations.size());
+
+            // Write up to 4 allocations
+            int allocIdx = 13;
+            for (size_t i = 0; i < std::min(decision.allocations.size(), size_t(4)); i++) {
+                const auto& alloc = decision.allocations[i];
+                intBuf[allocIdx++] = static_cast<int32_t>(alloc.venue);
+                *reinterpret_cast<int64_t*>(&intBuf[allocIdx]) = alloc.quantity;
+                allocIdx += 2;
+                intBuf[allocIdx++] = alloc.priority;
+            }
+        } else {
+            intBuf[12] = 0; // No allocations
+        }
+
+        return 0;
+
+    } catch (const std::exception& e) {
+        return -3;
+    }
+}
+
+JNIEXPORT void JNICALL
+Java_com_microoptimus_liquidator_sor_VWAPSmartOrderRouter_shutdownNative(
+    JNIEnv* /* env */, jobject /* obj */) {
+
+    try {
+        if (g_smartOrderRouter) {
+            g_smartOrderRouter.reset();
+        }
+    } catch (...) {
+        // Ignore errors during shutdown
+    }
+}
 
 } // extern "C"
 #endif
