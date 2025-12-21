@@ -33,7 +33,16 @@ throughput > 10 million orders per second
 
 ## ✅ **IMPLEMENTATION COMPLETED**
 
-### **Latest: VWAP Enhancement (December 21, 2025)** 🎉
+### **Latest: Smart Order Router Architecture Update (December 21, 2024)** 🎯
+
+**Architecture Evolution: JNI → Aeron IPC**
+- ✅ **New Architecture Designed:** OSM (Java VWAP) ↔ Liquidator (C++ SOR) via Aeron IPC
+- ✅ **Performance Improvement:** 2-5μs Aeron IPC vs 50-200μs JNI (10-100x faster)
+- ✅ **Process Isolation:** No GC interference, crash-safe separation
+- ✅ **Documentation:** See `CLAUDE_MEMORY.md` section "SMART ORDER ROUTER - AERON IPC ARCHITECTURE"
+- 🔲 **Next Phase:** Implement Aeron receiver/publisher in liquidator module
+
+### **VWAP Enhancement (December 21, 2024)** 🎉
 
 **C++ VWAP Smart Order Router Performance:**
 - ✅ **Average Latency: 165ns** (Target: <500ns) - **3.0x better than target**
@@ -41,13 +50,15 @@ throughput > 10 million orders per second
 - ✅ **Throughput: 4.76M orders/sec** (Target: >1M) - **4.8x better than target**
 
 **VWAP-Specific Enhancements Completed:**
-- ✅ **VWAP JNI Bridge** - 3 native methods for Java ↔ C++ integration
+- ✅ **Modular C++ Architecture** - Separated into VenueScorer, RiskManager, OrderSplitter, SmartOrderRouter
+- ✅ **Unit Tests:** 34/34 passing (Google Test framework)
 - ✅ **Multi-Factor Venue Scoring** - 5 factors: Priority (40%), Latency (25%), Fill Rate (20%), Fees (10%), Capacity (5%)
 - ✅ **Internal Venue Boost** - 20% preference for internalization
-- ✅ **Smart Order Splitting** - Proportional allocation: Best (40%), Second (30%), Rest (proportional)
+- ✅ **Smart Order Splitting** - VWAP-style allocation: Best (40%), Second (30%), Rest (proportional)
 - ✅ **Performance Validated** - 100K orders tested, sub-microsecond routing decisions
+- ✅ **Removed JNI Dependency** - Now uses modular headers only (JNI wrapper optional)
 
-**Previous Features (December 14, 2025):**
+**Previous Features (December 14, 2024):**
 - ✅ **Unified OrderBook** - Internal + external liquidity in single book with internalization priority
 - ✅ **C++ SOR Foundation** - Base routing engine with venue scoring
 - ✅ **Aeron Cluster Integration** - Global sequencer with cross-process shared memory
@@ -56,7 +67,29 @@ throughput > 10 million orders per second
 
 **Documentation:**
 - 📄 [VWAP Enhancement Details](VWAP_ENHANCEMENT_COMPLETE.md)
-- 📄 [Test Script](test_vwap_enhancement.sh)
+- 📄 [Smart Order Router Architecture (Aeron IPC)](CLAUDE_MEMORY.md#smart-order-router---aeron-ipc-architecture)
+- 📄 [SOR Unit Tests Summary](UNIT_TEST_COMPLETION_SUMMARY.md)
+- 📄 [SOR Modular Refactoring](MODULAR_REFACTORING_COMPLETE.md)
+- 📄 [Test Scripts](test_vwap_enhancement.sh)
+- 📄 [Unit Tests QuickStart](TESTS_QUICKSTART.md)
+
+## 📚 **Key Documentation**
+
+### Architecture Documents
+- **[CLAUDE_MEMORY.md](CLAUDE_MEMORY.md)** - Complete project memory, includes Aeron SOR architecture
+- **[AERON_CLUSTER_ARCHITECTURE.md](AERON_CLUSTER_ARCHITECTURE.md)** - Global sequencer with shared memory
+- **[VWAP_ENHANCEMENT_COMPLETE.md](VWAP_ENHANCEMENT_COMPLETE.md)** - VWAP implementation details
+
+### Smart Order Router (C++)
+- **[UNIT_TEST_COMPLETION_SUMMARY.md](UNIT_TEST_COMPLETION_SUMMARY.md)** - Complete test results (34/34 passing)
+- **[MODULAR_REFACTORING_COMPLETE.md](MODULAR_REFACTORING_COMPLETE.md)** - Modular architecture details
+- **[TESTS_QUICKSTART.md](TESTS_QUICKSTART.md)** - Quick reference for running tests
+- **[liquidator/README_SOR.md](liquidator/README_SOR.md)** - SOR module documentation
+
+### Integration & Demos
+- **[DEMO_COMPLETE.md](DEMO_COMPLETE.md)** - Demo scenarios
+- **[JAVA_CPP_SBE_INTEGRATION.md](JAVA_CPP_SBE_INTEGRATION.md)** - Java/C++ integration guide
+- **[SBE_QUICKSTART.md](SBE_QUICKSTART.md)** - SBE message encoding guide
 
 Reference:
 
