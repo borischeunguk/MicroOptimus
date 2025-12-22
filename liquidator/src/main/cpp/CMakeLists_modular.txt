@@ -104,7 +104,7 @@ set(SOR_SOURCES
 
 # Add JNI wrapper if enabled
 if(BUILD_WITH_JNI AND JNI_FOUND)
-    list(APPEND SOR_SOURCES sor/src/jni/jni_wrapper.cpp)
+    list(APPEND SOR_SOURCES sor/src/jni_wrapper.cpp)
 endif()
 
 # Build shared library

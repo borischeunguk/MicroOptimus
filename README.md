@@ -75,6 +75,11 @@ throughput > 10 million orders per second
 
 ## 📚 **Key Documentation**
 
+### Build System
+- **[CMAKE_BUILD_GUIDE.md](CMAKE_BUILD_GUIDE.md)** - CMake build system guide
+- **Quick Build:** `./build_all.sh` (builds entire project)
+- **Playground:** `./build/playground` (C++20 test executable)
+
 ### Architecture Documents
 - **[CLAUDE_MEMORY.md](CLAUDE_MEMORY.md)** - Complete project memory, includes Aeron SOR architecture
 - **[AERON_CLUSTER_ARCHITECTURE.md](AERON_CLUSTER_ARCHITECTURE.md)** - Global sequencer with shared memory

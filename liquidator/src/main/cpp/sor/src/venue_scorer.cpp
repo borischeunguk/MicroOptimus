@@ -1,5 +1,7 @@
 #include "microoptimus/sor/venue_scorer.hpp"
 #include <algorithm>
+#include <vector>
+#include <utility>
 
 namespace microoptimus {
 namespace sor {
