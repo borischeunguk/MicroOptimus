@@ -42,6 +42,17 @@ if(USE_FOLLY)
     if(folly_FOUND)
         message(STATUS "Found Folly")
         add_definitions(-DWITH_FOLLY)
+        # Folly requires C++20
+        set(CMAKE_CXX_STANDARD 20)
+        message(STATUS "Upgraded to C++20 for Folly compatibility")
+
+        # Workaround for macOS SDK include path issues with Folly
+        if(APPLE)
+            # Remove problematic system SDK paths that Folly's config might add
+            get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
+            list(FILTER dirs EXCLUDE REGEX ".*/CommandLineTools/SDKs/.*")
+            set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES ${dirs})
+        endif()
     else()
         message(WARNING "Folly not found, building without Folly support")
         set(USE_FOLLY OFF)
@@ -99,6 +110,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -march=native -mtune=native")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -ffast-math -funroll-loops")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0 -DDEBUG")
+
 
 # Source files for SOR library
 set(SOR_SOURCES
@@ -240,6 +252,44 @@ if(BUILD_TESTING)
         message(STATUS "Boost circular_buffer test disabled (USE_BOOST=${USE_BOOST}, Boost_FOUND=${Boost_FOUND})")
     endif()
 
+    # Folly SPSC queue test (only if Folly is enabled and found)
+    if(USE_FOLLY AND folly_FOUND)
+        add_executable(folly_spsc_queue_test test/test_folly_spsc_queue.cpp)
+        target_link_libraries(folly_spsc_queue_test
+            GTest::gtest
+            GTest::gtest_main
+            Folly::folly
+            pthread
+        )
+
+        # Workaround for macOS SDK include path issues with Folly
+        # The issue is that Folly's CMake config adds system SDK paths that interfere
+        # with C++ standard library headers. We need to ensure C++ headers come first.
+        if(APPLE)
+            target_compile_options(folly_spsc_queue_test PRIVATE
+                # Remove any system SDK include that might be added by Folly
+                -Wno-error
+            )
+            # Get the correct SDK path
+            execute_process(
+                COMMAND xcrun --show-sdk-path
+                OUTPUT_VARIABLE MACOS_SDK_PATH
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+            )
+            # Explicitly set the include order: C++ stdlib first, then C stdlib
+            target_include_directories(folly_spsc_queue_test SYSTEM BEFORE PRIVATE
+                "${MACOS_SDK_PATH}/usr/include/c++/v1"
+            )
+        endif()
+
+        # Register with CTest
+        gtest_discover_tests(folly_spsc_queue_test)
+
+        message(STATUS "Folly SPSC queue test enabled")
+    else()
+        message(STATUS "Folly SPSC queue test disabled (USE_FOLLY=${USE_FOLLY}, folly_FOUND=${folly_FOUND})")
+    endif()
+
     # Add tests to CTest
     add_test(NAME UnitTests COMMAND sor_unit_tests)
     add_test(NAME PerformanceTest COMMAND sor_perf_test)
@@ -248,6 +298,9 @@ if(BUILD_TESTING)
     set(TEST_DEPENDENCIES sor_unit_tests sor_perf_test)
     if(USE_BOOST AND Boost_FOUND)
         list(APPEND TEST_DEPENDENCIES boost_circular_buffer_test)
+    endif()
+    if(USE_FOLLY AND folly_FOUND)
+        list(APPEND TEST_DEPENDENCIES folly_spsc_queue_test)
     endif()
 
     add_custom_target(run_tests
