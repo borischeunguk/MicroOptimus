@@ -21,7 +21,13 @@ option(USE_FOLLY "Use Folly libraries" OFF)
 
 # Find dependencies
 if(USE_BOOST)
-    find_package(Boost COMPONENTS system thread)
+    # Try finding Boost with CONFIG mode first (modern CMake)
+    find_package(Boost 1.70 CONFIG QUIET)
+    if(NOT Boost_FOUND)
+        # Fall back to MODULE mode
+        find_package(Boost 1.70 COMPONENTS system thread)
+    endif()
+
     if(Boost_FOUND)
         message(STATUS "Found Boost: ${Boost_VERSION}")
         add_definitions(-DWITH_BOOST)
@@ -124,7 +130,15 @@ if(BUILD_WITH_JNI AND JNI_FOUND)
 endif()
 
 if(USE_BOOST AND Boost_FOUND)
-    target_link_libraries(smartorderrouter Boost::system Boost::thread)
+    if(TARGET Boost::headers)
+        # Modern CMake Boost (header-only is enough for circular_buffer)
+        target_link_libraries(smartorderrouter Boost::headers)
+    elseif(TARGET Boost::boost)
+        target_link_libraries(smartorderrouter Boost::boost)
+    elseif(Boost_INCLUDE_DIRS)
+        # Legacy Boost
+        target_include_directories(smartorderrouter PUBLIC ${Boost_INCLUDE_DIRS})
+    endif()
 endif()
 
 if(USE_FOLLY AND folly_FOUND)
@@ -161,7 +175,13 @@ if(BUILD_TESTING)
     )
 
     if(USE_BOOST AND Boost_FOUND)
-        target_link_libraries(sor_unit_tests Boost::system Boost::thread)
+        if(TARGET Boost::headers)
+            target_link_libraries(sor_unit_tests Boost::headers)
+        elseif(TARGET Boost::boost)
+            target_link_libraries(sor_unit_tests Boost::boost)
+        elseif(Boost_INCLUDE_DIRS)
+            target_include_directories(sor_unit_tests PUBLIC ${Boost_INCLUDE_DIRS})
+        endif()
     endif()
 
     if(USE_FOLLY AND folly_FOUND)
@@ -177,7 +197,13 @@ if(BUILD_TESTING)
     target_link_libraries(sor_perf_test smartorderrouter pthread)
 
     if(USE_BOOST AND Boost_FOUND)
-        target_link_libraries(sor_perf_test Boost::system Boost::thread)
+        if(TARGET Boost::headers)
+            target_link_libraries(sor_perf_test Boost::headers)
+        elseif(TARGET Boost::boost)
+            target_link_libraries(sor_perf_test Boost::boost)
+        elseif(Boost_INCLUDE_DIRS)
+            target_include_directories(sor_perf_test PUBLIC ${Boost_INCLUDE_DIRS})
+        endif()
     endif()
 
     if(USE_FOLLY AND folly_FOUND)
@@ -188,14 +214,45 @@ if(BUILD_TESTING)
     add_executable(sbe_shm_reader_test test/sbe_shared_memory_reader_test.cpp)
     target_link_libraries(sbe_shm_reader_test pthread)
 
+    # Boost circular_buffer test (only if Boost is enabled and found)
+    if(USE_BOOST AND Boost_FOUND)
+        add_executable(boost_circular_buffer_test test/test_boost_circular_buffer.cpp)
+        target_link_libraries(boost_circular_buffer_test
+            GTest::gtest
+            GTest::gtest_main
+            pthread
+        )
+
+        # Link Boost (circular_buffer is header-only)
+        if(TARGET Boost::headers)
+            target_link_libraries(boost_circular_buffer_test Boost::headers)
+        elseif(TARGET Boost::boost)
+            target_link_libraries(boost_circular_buffer_test Boost::boost)
+        elseif(Boost_INCLUDE_DIRS)
+            target_include_directories(boost_circular_buffer_test PUBLIC ${Boost_INCLUDE_DIRS})
+        endif()
+
+        # Register with CTest
+        gtest_discover_tests(boost_circular_buffer_test)
+
+        message(STATUS "Boost circular_buffer test enabled")
+    else()
+        message(STATUS "Boost circular_buffer test disabled (USE_BOOST=${USE_BOOST}, Boost_FOUND=${Boost_FOUND})")
+    endif()
+
     # Add tests to CTest
     add_test(NAME UnitTests COMMAND sor_unit_tests)
     add_test(NAME PerformanceTest COMMAND sor_perf_test)
 
     # Custom test target
+    set(TEST_DEPENDENCIES sor_unit_tests sor_perf_test)
+    if(USE_BOOST AND Boost_FOUND)
+        list(APPEND TEST_DEPENDENCIES boost_circular_buffer_test)
+    endif()
+
     add_custom_target(run_tests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
-        DEPENDS sor_unit_tests sor_perf_test
+        DEPENDS ${TEST_DEPENDENCIES}
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
         COMMENT "Running all tests"
     )
