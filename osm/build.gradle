@@ -13,10 +13,14 @@ application {
 
 dependencies {
     implementation project(':common')
+    implementation project(':internaliser')
     implementation project(':liquidator')
 
+    // Aeron for cluster integration
+    api 'io.aeron:aeron-all:1.44.1'
+    api 'org.agrona:agrona:1.21.1'
+
     // CoralBlocks dependencies inherited from root build.gradle
-    // No need to redeclare here as they're in subprojects block
 }
 
 jmh {
