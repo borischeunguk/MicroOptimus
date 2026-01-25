@@ -1,0 +1,47 @@
+# Gradle
+.gradle/
+**/build/
+
+# Maven
+**/target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# IntelliJ IDEA
+**/.idea/
+**/*.iml
+**/*.ipr
+**/*.iws
+**/out/
+
+# Kotlin/Java (misc)
+**/*.class
+
+# C/C++ (CMake + common build dirs)
+**/CMakeFiles/
+**/CMakeCache.txt
+**/cmake-build-*/
+**/build-*/
+
+# Rust
+**/target/
+
+# Node/TypeScript
+**/node_modules/
+**/dist/
+**/.next/
+**/.turbo/
+
+# Python
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+**/.venv/
+**/venv/
+
+# Go
+**/*.exe
+**/*.test
+
+# OS
+.DS_Store
