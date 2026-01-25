@@ -1,0 +1,23 @@
+plugins {
+    id 'java-library'
+    id 'me.champeau.jmh' version '0.7.2'
+}
+
+description = 'Internaliser - Internal Orderbook and Matching Engine'
+
+dependencies {
+    implementation project(':common')
+
+    // Aeron for cluster integration
+    api 'io.aeron:aeron-all:1.44.1'
+    api 'org.agrona:agrona:1.21.1'
+}
+
+jmh {
+    jmhVersion = '1.37'
+    iterations = 3
+    fork = 1
+    warmupIterations = 2
+    benchmarkMode = ['thrpt', 'avgt']
+    timeUnit = 'ns'
+}
