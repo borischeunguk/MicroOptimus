@@ -1,5 +1,8 @@
 # CLAUDE.md
 
+Always ask me questions to clarify the product requirements, technical requirements, hard constraints 
+ and engineering principles before writing any code.
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
