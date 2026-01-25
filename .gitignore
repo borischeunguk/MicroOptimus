@@ -45,3 +45,13 @@
 
 # OS
 .DS_Store
+/CoralCpp/
+/CoralME/
+/CoralPool/
+/CoralQueue/
+/CoralRing/
+/disruptor/
+/agrona/
+/aeron-cookbook-code/
+/aeron/
+/simple-binary-encoding/
