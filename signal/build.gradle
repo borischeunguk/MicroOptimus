@@ -2,9 +2,15 @@ plugins {
     id 'java-library'
 }
 
-description = 'Signal - Market Making Strategy (OSM-Signal)'
+description = 'Signal - Market Making Strategy and Principal Trading (OSM-Signal)'
 
 dependencies {
     implementation project(':common')
+    implementation project(':osm')        // For SOR access
+    implementation project(':recombinor') // For unified book access
+
+    // Aeron for cluster integration
+    api 'io.aeron:aeron-all:1.44.1'
+    api 'org.agrona:agrona:1.21.1'
 }
 
