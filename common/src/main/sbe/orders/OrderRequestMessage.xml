@@ -57,6 +57,18 @@
             <validValue name="ARCA">5</validValue>
             <validValue name="IEX">6</validValue>
         </enum>
+
+        <enum name="OrderFlowType" encodingType="uint8" description="Order flow classification">
+            <validValue name="DMA">0</validValue>
+            <validValue name="PRINCIPAL">1</validValue>
+            <validValue name="ALGO_SLICE">2</validValue>
+        </enum>
+
+        <enum name="TimeInForce" encodingType="uint8" description="Time-in-force instruction">
+            <validValue name="IOC">0</validValue>
+            <validValue name="GTC">1</validValue>
+            <validValue name="DAY">2</validValue>
+        </enum>
     </types>
 
     <sbe:message name="OrderRequest" id="1" description="Order routing request for zero-JNI SOR communication">
@@ -72,7 +84,9 @@
         <field name="maxLatencyNanos" id="10" type="uint64" description="Maximum acceptable latency"/>
         <field name="clientId" id="11" type="uint32" description="Client identifier"/>
         <field name="minFillQty" id="12" type="uint64" description="Minimum fill quantity"/>
-        <field name="timeInForce" id="13" type="uint8" description="0=IOC, 1=GTC, 2=DAY"/>
+        <field name="timeInForce" id="13" type="TimeInForce" description="Time-in-force instruction"/>
+        <field name="flowType" id="14" type="OrderFlowType" description="Order flow classification"/>
+        <field name="parentOrderId" id="15" type="uint64" description="Parent algo order ID if this is a slice"/>
     </sbe:message>
 
     <sbe:message name="RoutingDecision" id="2" description="SOR routing decision response">
