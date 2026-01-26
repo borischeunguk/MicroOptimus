@@ -1,10 +1,12 @@
 rootProject.name = 'microoptimus'
 
 include 'common'
+include 'internaliser'
 include 'osm'
 include 'liquidator'
 include 'recombinor'
 include 'gateway'
 include 'signal'
+include 'algo'
 include 'app'
 
