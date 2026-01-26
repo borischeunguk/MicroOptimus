@@ -11,11 +11,13 @@ application {
 
 dependencies {
     implementation project(':common')
+    implementation project(':internaliser')
     implementation project(':osm')
     implementation project(':liquidator')
     implementation project(':recombinor')
     implementation project(':gateway')
     implementation project(':signal')
+    implementation project(':algo')
 
     // Thread affinity (optional - for production performance)
     // implementation 'net.openhft:affinity:3.23.3'
