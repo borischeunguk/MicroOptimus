@@ -177,6 +177,8 @@ public class InternalMatchingEngine {
             return new CancelResult(orderId, CancelResult.Status.NOT_FOUND, 0);
         }
 
+        // Calculate cancelled quantity (leavesQuantity is set to 0 by cancel())
+        long cancelledQty = order.getOriginalQuantity() - order.getExecutedQuantity();
         cancelCount++;
 
         // Generate execution report
@@ -189,7 +191,7 @@ public class InternalMatchingEngine {
         // Return order to pool
         orderBook.removeOrder(order);
 
-        return new CancelResult(orderId, CancelResult.Status.CANCELLED, order.getLeavesQuantity());
+        return new CancelResult(orderId, CancelResult.Status.CANCELLED, cancelledQty);
     }
 
     /**

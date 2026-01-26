@@ -117,14 +117,12 @@ public class PriceLevel {
 
     /**
      * Update quantity after order execution (without removal)
+     * Note: Order removal is handled by InternalOrderBook.removeOrder()
      */
     public void onOrderExecuted(Order order, long executedQty) {
         totalQuantity -= executedQty;
-
-        // Remove order if fully filled
-        if (order.isFilled()) {
-            removeOrder(order);
-        }
+        // Don't auto-remove filled orders here - let InternalOrderBook.removeOrder() handle it
+        // to ensure proper level cleanup and pool management
     }
 
     /**
