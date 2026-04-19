@@ -4,7 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Rust implementation of performance-critical components from the MicroOptimus trading system. This is an early-stage port — currently only `hello_world` exists as a starter crate. The `algo/`, `signal/`, and `sor/` directories are empty placeholders for future modules mirroring the Java architecture.
+MVP / POC version of the Rust module for MicroOptimus. This Rust code will only implement core components of the trading system. 
+signals focus on quantitative mathematical calculations for algos and sor strategies
+algo focus on executions algorithms, currently only support VWAP algo which takes params from signals module, slices parent orders to child orders 
+sor focus on order routing logic,which takes child orders from algo module and routes to different venues based on market conditions and order parameters. 
+The Rust module will use Aeron Sequencer ( UDP Multicast ) for IPC, SBE and shared memory ( memory mapped files) architecture. 
+The primary goal is to implement the Smart Order Router (SOR) and algorithmic execution strategies in rust, with a focus on ultra-low latency and high throughput.
 
 ## Build Commands
 
