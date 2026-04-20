@@ -1,0 +1,17 @@
+[workspace]
+members = [
+    "common",
+    "signal",
+    "algo",
+    "sor",
+    "hello_world",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+
+[workspace.dependencies]
+memmap2 = "0.9"
+crossbeam-utils = "0.8"
