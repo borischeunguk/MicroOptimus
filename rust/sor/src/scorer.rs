@@ -134,10 +134,22 @@ mod tests {
         [
             None, // Internal - skip for external-only test
             Some(VenueConfig::new(
-                VenueId::Cme, 90, true, 1_000_000, 150_000, 0.95, 0.0001,
+                VenueId::Cme,
+                90,
+                true,
+                1_000_000,
+                150_000,
+                0.95,
+                0.0001,
             )),
             Some(VenueConfig::new(
-                VenueId::Nasdaq, 85, true, 500_000, 200_000, 0.93, 0.0002,
+                VenueId::Nasdaq,
+                85,
+                true,
+                500_000,
+                200_000,
+                0.93,
+                0.0002,
             )),
         ]
     }
@@ -184,7 +196,13 @@ mod tests {
         let request = make_request(500);
         let mut configs = make_configs();
         configs[VenueId::Internal.index()] = Some(VenueConfig::new(
-            VenueId::Internal, 100, true, 10_000_000, 0, 1.0, 0.0,
+            VenueId::Internal,
+            100,
+            true,
+            10_000_000,
+            0,
+            1.0,
+            0.0,
         ));
 
         let scores = scorer.score_venues(&request, &configs, true);
@@ -200,7 +218,15 @@ mod tests {
         let request = make_request(100);
         let configs = [
             None,
-            Some(VenueConfig::new(VenueId::Cme, 90, false, 1_000_000, 150_000, 0.95, 0.0001)),
+            Some(VenueConfig::new(
+                VenueId::Cme,
+                90,
+                false,
+                1_000_000,
+                150_000,
+                0.95,
+                0.0001,
+            )),
             None,
         ];
 

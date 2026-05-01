@@ -89,10 +89,7 @@ impl MmapRingBuffer {
             .open(path)
             .expect("failed to open ring buffer file");
         let meta = file.metadata().expect("failed to get file metadata");
-        assert!(
-            meta.len() >= total as u64,
-            "ring buffer file too small"
-        );
+        assert!(meta.len() >= total as u64, "ring buffer file too small");
 
         let mmap = unsafe { MmapMut::map_mut(&file).expect("failed to mmap file") };
         Self { mmap, capacity }
@@ -108,11 +105,17 @@ impl MmapRingBuffer {
     }
 
     fn write_pos(&self) -> &AtomicU64 {
-        unsafe { &*(self.mmap.as_ptr().add(WRITE_POS_OFFSET) as *const CachePadded<AtomicU64> as *const AtomicU64) }
+        unsafe {
+            &*(self.mmap.as_ptr().add(WRITE_POS_OFFSET) as *const CachePadded<AtomicU64>
+                as *const AtomicU64)
+        }
     }
 
     fn read_pos(&self) -> &AtomicU64 {
-        unsafe { &*(self.mmap.as_ptr().add(READ_POS_OFFSET) as *const CachePadded<AtomicU64> as *const AtomicU64) }
+        unsafe {
+            &*(self.mmap.as_ptr().add(READ_POS_OFFSET) as *const CachePadded<AtomicU64>
+                as *const AtomicU64)
+        }
     }
 
     fn data_ptr(&self) -> *const u8 {
@@ -163,7 +166,11 @@ impl MmapRingBuffer {
             // Write length header
             std::ptr::write(ptr.add(offset) as *mut u32, msg_len as u32);
             // Write payload
-            std::ptr::copy_nonoverlapping(data.as_ptr(), ptr.add(offset + FRAME_HEADER_SIZE), msg_len);
+            std::ptr::copy_nonoverlapping(
+                data.as_ptr(),
+                ptr.add(offset + FRAME_HEADER_SIZE),
+                msg_len,
+            );
         }
 
         // Release the write
@@ -294,8 +301,7 @@ mod tests {
         assert!(rb.publish(bytes));
 
         let received = rb.poll().expect("should have message");
-        let restored: &VwapParamsMsg =
-            unsafe { &*(received.as_ptr() as *const VwapParamsMsg) };
+        let restored: &VwapParamsMsg = unsafe { &*(received.as_ptr() as *const VwapParamsMsg) };
         assert_eq!(restored.symbol_index, 7);
         assert_eq!(restored.num_buckets, 10);
         assert!((restored.participation_rate - 0.15).abs() < f64::EPSILON);
@@ -307,10 +313,7 @@ mod tests {
 
         let capacity = 65536;
         let dir = std::env::temp_dir();
-        let path = dir.join(format!(
-            "test_spsc_ring_buffer_{}",
-            std::process::id()
-        ));
+        let path = dir.join(format!("test_spsc_ring_buffer_{}", std::process::id()));
 
         // Clean up from previous runs
         let _ = std::fs::remove_file(&path);

@@ -66,7 +66,9 @@ impl<S: IpcSubscriber, P: IpcPublisher> SorService<S, P> {
             let mut msg = RoutingDecisionMsg {
                 order_id: decision.order_id,
                 action: decision.action,
-                primary_venue: decision.primary_venue.unwrap_or(common::types::VenueId::Internal),
+                primary_venue: decision
+                    .primary_venue
+                    .unwrap_or(common::types::VenueId::Internal),
                 total_quantity: decision.quantity,
                 timestamp: slice_msg.timestamp,
                 ..RoutingDecisionMsg::default()

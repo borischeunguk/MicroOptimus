@@ -5,3 +5,19 @@ edition.workspace = true
 
 [dependencies]
 common = { path = "../common" }
+
+[dev-dependencies]
+algo = { path = "../algo" }
+criterion = "0.5"
+hdrhistogram = "7"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[[bench]]
+name = "router_latency"
+harness = false
+
+[[bench]]
+name = "e2e_algo_sor_latency"
+harness = false
+

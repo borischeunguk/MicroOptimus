@@ -215,7 +215,18 @@ mod tests {
 
     fn make_order() -> AlgoOrder {
         let mut order = AlgoOrder::default();
-        order.init(1, 100, 0, Side::Buy, 10_000, 15_000_000, AlgorithmType::Vwap, 1000, 2000, 999);
+        order.init(
+            1,
+            100,
+            0,
+            Side::Buy,
+            10_000,
+            15_000_000,
+            AlgorithmType::Vwap,
+            1000,
+            2000,
+            999,
+        );
         order
     }
 

@@ -151,13 +151,16 @@ impl SmartOrderRouter {
         let has_internal = self.check_internal_liquidity(request);
 
         // 3. Score venues
-        let scores = self.scorer.score_venues(request, &self.venue_configs, has_internal);
+        let scores = self
+            .scorer
+            .score_venues(request, &self.venue_configs, has_internal);
 
         // 4. Find best venue
-        let best = scores
-            .iter()
-            .filter(|s| s.is_valid())
-            .max_by(|a, b| a.total_score.partial_cmp(&b.total_score).unwrap_or(std::cmp::Ordering::Equal));
+        let best = scores.iter().filter(|s| s.is_valid()).max_by(|a, b| {
+            a.total_score
+                .partial_cmp(&b.total_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         let best = match best {
             Some(s) => s,
@@ -196,12 +199,24 @@ impl SmartOrderRouter {
     fn initialize_default_configs(&mut self) {
         // CME: low latency, high fill rate
         self.venue_configs[VenueId::Cme.index()] = Some(VenueConfig::new(
-            VenueId::Cme, 90, true, 1_000_000, 150_000, 0.95, 0.0001,
+            VenueId::Cme,
+            90,
+            true,
+            1_000_000,
+            150_000,
+            0.95,
+            0.0001,
         ));
 
         // NASDAQ: slightly higher latency
         self.venue_configs[VenueId::Nasdaq.index()] = Some(VenueConfig::new(
-            VenueId::Nasdaq, 85, true, 500_000, 200_000, 0.93, 0.0002,
+            VenueId::Nasdaq,
+            85,
+            true,
+            500_000,
+            200_000,
+            0.93,
+            0.0002,
         ));
     }
 
@@ -281,7 +296,13 @@ mod tests {
 
         // Add internal venue config
         sor.configure_venue(VenueConfig::new(
-            VenueId::Internal, 100, true, 10_000_000, 0, 1.0, 0.0,
+            VenueId::Internal,
+            100,
+            true,
+            10_000_000,
+            0,
+            1.0,
+            0.0,
         ));
         sor.set_internal_liquidity_threshold(5000);
 
@@ -318,17 +339,33 @@ mod tests {
         sor.initialize();
         // Set CME max to small so split is triggered
         sor.configure_venue(VenueConfig::new(
-            VenueId::Cme, 90, true, 500, 150_000, 0.95, 0.0001,
+            VenueId::Cme,
+            90,
+            true,
+            500,
+            150_000,
+            0.95,
+            0.0001,
         ));
         sor.configure_venue(VenueConfig::new(
-            VenueId::Nasdaq, 85, true, 500, 200_000, 0.93, 0.0002,
+            VenueId::Nasdaq,
+            85,
+            true,
+            500,
+            200_000,
+            0.93,
+            0.0002,
         ));
         sor.set_internal_liquidity_threshold(100);
 
         let decision = sor.route_order(&make_request(800));
         // Both venues have max 500 each, order is 800 > best max (500)
         // Should split across both venues
-        assert!(decision.is_split(), "expected split, got {:?}", decision.action);
+        assert!(
+            decision.is_split(),
+            "expected split, got {:?}",
+            decision.action
+        );
         let total: u64 = decision.allocations.iter().map(|a| a.quantity).sum();
         assert_eq!(total, 800);
     }

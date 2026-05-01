@@ -307,7 +307,18 @@ mod tests {
 
     fn make_order(total_qty: u64, start: u64, end: u64) -> AlgoOrder {
         let mut order = AlgoOrder::default();
-        order.init(1, 100, 0, Side::Buy, total_qty, 15_000_000, AlgorithmType::Vwap, start, end, start);
+        order.init(
+            1,
+            100,
+            0,
+            Side::Buy,
+            total_qty,
+            15_000_000,
+            AlgorithmType::Vwap,
+            start,
+            end,
+            start,
+        );
         order.params = VwapParams {
             num_buckets: 10,
             participation_rate: 0.10,

@@ -77,7 +77,17 @@ impl<S: IpcSubscriber, P: IpcPublisher> AlgoService<S, P> {
         let slices = self.engine.process_orders(current_time, current_price);
 
         let mut published = 0u64;
-        for (slice_id, parent_order_id, symbol_index, side, quantity, price, slice_number, timestamp) in slices {
+        for (
+            slice_id,
+            parent_order_id,
+            symbol_index,
+            side,
+            quantity,
+            price,
+            slice_number,
+            timestamp,
+        ) in slices
+        {
             let msg = SliceMsg {
                 slice_id,
                 parent_order_id,
