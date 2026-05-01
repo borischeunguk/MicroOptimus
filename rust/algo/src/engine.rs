@@ -157,11 +157,7 @@ impl AlgoEngine {
     ///
     /// Returns a Vec of (slice_id, parent_order_id, symbol_index, side, quantity, price, slice_number, timestamp)
     /// for each generated slice.
-    pub fn process_orders(
-        &mut self,
-        current_time: u64,
-        current_price: u64,
-    ) -> Vec<SliceInfo> {
+    pub fn process_orders(&mut self, current_time: u64, current_price: u64) -> Vec<SliceInfo> {
         let mut generated = Vec::new();
         let mut expired = Vec::new();
 
@@ -307,8 +303,16 @@ mod tests {
     fn test_submit_order() {
         let mut engine = AlgoEngine::new();
         let id = engine.submit_order(
-            1, 0, Side::Buy, 10_000, 15_000_000, AlgorithmType::Vwap,
-            default_params(), 0, 100_000, 0,
+            1,
+            0,
+            Side::Buy,
+            10_000,
+            15_000_000,
+            AlgorithmType::Vwap,
+            default_params(),
+            0,
+            100_000,
+            0,
         );
         assert_eq!(id, 1);
         assert_eq!(engine.active_order_count(), 1);
@@ -319,8 +323,16 @@ mod tests {
     fn test_start_order() {
         let mut engine = AlgoEngine::new();
         let id = engine.submit_order(
-            1, 0, Side::Buy, 10_000, 15_000_000, AlgorithmType::Vwap,
-            default_params(), 0, 100_000, 0,
+            1,
+            0,
+            Side::Buy,
+            10_000,
+            15_000_000,
+            AlgorithmType::Vwap,
+            default_params(),
+            0,
+            100_000,
+            0,
         );
         assert!(engine.start_order(id, 0));
         let order = engine.get_order(id).unwrap();
@@ -331,8 +343,16 @@ mod tests {
     fn test_cancel_order() {
         let mut engine = AlgoEngine::new();
         let id = engine.submit_order(
-            1, 0, Side::Buy, 10_000, 15_000_000, AlgorithmType::Vwap,
-            default_params(), 0, 100_000, 0,
+            1,
+            0,
+            Side::Buy,
+            10_000,
+            15_000_000,
+            AlgorithmType::Vwap,
+            default_params(),
+            0,
+            100_000,
+            0,
         );
         engine.start_order(id, 0);
         assert!(engine.cancel_order(id, 1000));
@@ -344,8 +364,16 @@ mod tests {
     fn test_process_orders_generates_slices() {
         let mut engine = AlgoEngine::new();
         let id = engine.submit_order(
-            1, 0, Side::Buy, 10_000, 15_000_000, AlgorithmType::Vwap,
-            default_params(), 0, 100_000, 0,
+            1,
+            0,
+            Side::Buy,
+            10_000,
+            15_000_000,
+            AlgorithmType::Vwap,
+            default_params(),
+            0,
+            100_000,
+            0,
         );
         engine.start_order(id, 0);
 
@@ -365,8 +393,16 @@ mod tests {
     fn test_order_expiration() {
         let mut engine = AlgoEngine::new();
         let id = engine.submit_order(
-            1, 0, Side::Buy, 10_000, 15_000_000, AlgorithmType::Vwap,
-            default_params(), 0, 1_000, 0,
+            1,
+            0,
+            Side::Buy,
+            10_000,
+            15_000_000,
+            AlgorithmType::Vwap,
+            default_params(),
+            0,
+            1_000,
+            0,
         );
         engine.start_order(id, 0);
 
@@ -380,8 +416,16 @@ mod tests {
     fn test_slice_execution_feedback() {
         let mut engine = AlgoEngine::new();
         let id = engine.submit_order(
-            1, 0, Side::Buy, 1_000, 15_000_000, AlgorithmType::Vwap,
-            default_params(), 0, 100_000, 0,
+            1,
+            0,
+            Side::Buy,
+            1_000,
+            15_000_000,
+            AlgorithmType::Vwap,
+            default_params(),
+            0,
+            100_000,
+            0,
         );
         engine.start_order(id, 0);
 
@@ -399,8 +443,16 @@ mod tests {
     fn test_pause_resume() {
         let mut engine = AlgoEngine::new();
         let id = engine.submit_order(
-            1, 0, Side::Buy, 10_000, 15_000_000, AlgorithmType::Vwap,
-            default_params(), 0, 100_000, 0,
+            1,
+            0,
+            Side::Buy,
+            10_000,
+            15_000_000,
+            AlgorithmType::Vwap,
+            default_params(),
+            0,
+            100_000,
+            0,
         );
         engine.start_order(id, 0);
 
@@ -419,12 +471,28 @@ mod tests {
     fn test_multiple_orders() {
         let mut engine = AlgoEngine::new();
         let id1 = engine.submit_order(
-            1, 0, Side::Buy, 5_000, 15_000_000, AlgorithmType::Vwap,
-            default_params(), 0, 100_000, 0,
+            1,
+            0,
+            Side::Buy,
+            5_000,
+            15_000_000,
+            AlgorithmType::Vwap,
+            default_params(),
+            0,
+            100_000,
+            0,
         );
         let id2 = engine.submit_order(
-            2, 1, Side::Sell, 3_000, 14_000_000, AlgorithmType::Vwap,
-            default_params(), 0, 100_000, 0,
+            2,
+            1,
+            Side::Sell,
+            3_000,
+            14_000_000,
+            AlgorithmType::Vwap,
+            default_params(),
+            0,
+            100_000,
+            0,
         );
         engine.start_order(id1, 0);
         engine.start_order(id2, 0);
