@@ -140,6 +140,47 @@ cmake --build . && ./sor_unit_tests && ./sor_perf_test
 ctest --output-on-failure
 ```
 
+## Java MVP Benchmark Parity (No C++/JNI)
+
+Rust-parity metrics are written as JSON with keys:
+
+- `latency_ns_p90`
+- `latency_ns_p99`
+- `latency_ns_p999`
+- throughput fields per benchmark
+
+Current Java scope matches Rust setup:
+
+- SPSC handoff simulation with Disruptor `RingBuffer`
+- no synthetic venue ack-return latency
+- CME/NASDAQ-only routing paths in benchmark scenarios
+
+Run from repo root:
+
+```bash
+./gradlew :algo:jmh
+./gradlew :liquidator:jmh
+```
+
+Fast single-benchmark run examples:
+
+```bash
+./gradlew :algo:jmh -PjmhIncludePattern=.*AlgoVwapLatencyBenchmark.* -PjmhWarmupIterations=1 -PjmhIterations=1
+./gradlew :liquidator:jmh -PjmhIncludePattern=.*SorJavaFallbackLatencyBenchmark.* -PjmhWarmupIterations=1 -PjmhIterations=1
+```
+
+Outputs:
+
+- `algo/perf-reports/vwap_latency_<scenario>.json`
+- `algo/perf-reports/e2e_algo_sor_latency_<scenario>.json`
+- `liquidator/perf-reports/router_latency_<scenario>.json`
+
+Scenario IDs:
+
+- Algo: `algo_s1_steady`, `algo_s2_open_burst`, `algo_s3_thin_liquidity`, `algo_s4_large_parent`
+- SOR: `sor_s1_steady`, `sor_s2_open_burst`, `sor_s3_thin_liquidity`, `sor_s4_large_parent_children`
+- E2E: `e2e_s1_steady`, `e2e_s2_open_burst`, `e2e_s3_thin_liquidity`, `e2e_s4_large_parent`
+
 ### Troubleshooting
 
 **Issue**: Google Test not found  

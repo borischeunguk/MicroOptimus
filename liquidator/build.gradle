@@ -1,6 +1,7 @@
 plugins {
     id 'java-library'
     id 'application'
+    id 'me.champeau.jmh' version '0.7.2'
 }
 
 description = 'Liquidator - Smart Order Router with C++ Ultra-Low Latency Core'
@@ -70,7 +71,28 @@ task generateJNIHeaders(type: Exec) {
 
 // Ensure C++ compilation happens after Java compilation
 compileCppSOR.dependsOn generateJNIHeaders
-compileJava.finalizedBy compileCppSOR
+
+// Keep Java-only benchmark workflows free from JNI/C++ build requirements.
+if (project.hasProperty('autoBuildCpp') && project.property('autoBuildCpp').toString().toBoolean()) {
+    compileJava.finalizedBy compileCppSOR
+}
+
+jmh {
+    jmhVersion = '1.37'
+    iterations = (project.findProperty('jmhIterations') ?: '3') as int
+    fork = (project.findProperty('jmhFork') ?: '1') as int
+    warmupIterations = (project.findProperty('jmhWarmupIterations') ?: '2') as int
+    threads = 1
+    includes = [project.findProperty('jmhIncludePattern') ?: '.*Benchmark.*']
+}
+
+sourceSets {
+    jmh {
+        java.srcDirs = ['src/jmh/java']
+        compileClasspath += sourceSets.main.runtimeClasspath
+        runtimeClasspath += sourceSets.main.runtimeClasspath
+    }
+}
 
 // Task to run Smart Order Router test
 task runSORTest(type: JavaExec) {
