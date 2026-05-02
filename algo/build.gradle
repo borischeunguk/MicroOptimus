@@ -1,5 +1,6 @@
 plugins {
     id 'java-library'
+    id 'me.champeau.jmh' version '0.7.2'
 }
 
 description = 'Algo - Algorithmic Order Execution (VWAP, TWAP, Iceberg)'
@@ -8,7 +9,28 @@ dependencies {
     implementation project(':common')
     implementation project(':osm')  // For SOR access
 
+    // Pure Java SOR benchmark dependency (no JNI/C++)
+    jmhImplementation project(':liquidator')
+
     // Aeron for cluster integration
     api 'io.aeron:aeron-all:1.44.1'
     api 'org.agrona:agrona:1.21.1'
 }
+
+jmh {
+    jmhVersion = '1.37'
+    iterations = (project.findProperty('jmhIterations') ?: '3') as int
+    fork = (project.findProperty('jmhFork') ?: '1') as int
+    warmupIterations = (project.findProperty('jmhWarmupIterations') ?: '2') as int
+    threads = 1
+    includes = [project.findProperty('jmhIncludePattern') ?: '.*Benchmark.*']
+}
+
+sourceSets {
+    jmh {
+        java.srcDirs = ['src/jmh/java']
+        compileClasspath += sourceSets.main.runtimeClasspath
+        runtimeClasspath += sourceSets.main.runtimeClasspath
+    }
+}
+
