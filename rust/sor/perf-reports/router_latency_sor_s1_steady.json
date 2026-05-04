@@ -1,0 +1,9 @@
+{
+  "bench": "sor_router_latency",
+  "scenario": "sor_s1_steady",
+  "samples": 1000000,
+  "latency_ns_p90": 62,
+  "latency_ns_p99": 64,
+  "latency_ns_p999": 78,
+  "throughput_routes_per_sec": 8680417.51280483
+}
