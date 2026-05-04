@@ -2,7 +2,7 @@
 /target/
 
 # Benchmark/report artifacts (kept local, do not commit)
-**/perf-reports/
+# **/perf-reports/
 
 # macOS local file
 .DS_Store

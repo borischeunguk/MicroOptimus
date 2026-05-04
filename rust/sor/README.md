@@ -10,6 +10,7 @@ Criterion benchmarks are provided for SOR-only and end-to-end algo+SOR latency.
 - End-to-end benchmark: `benches/e2e_algo_sor_latency.rs`
 - Report output: `perf-reports/*.json`
 - Metrics include p90/p99/p99.9 latency and throughput.
+- Minimum parent/route samples per scenario: `1,000,000` (for stable comparisons)
 
 ## Scenarios (v1)
 
@@ -36,4 +37,6 @@ cd /Users/xinyue/IdeaProjects/MicroOptimus/rust/sor
 cargo bench --bench router_latency -- --warm-up-time 0.5 --measurement-time 1
 cargo bench --bench e2e_algo_sor_latency -- --warm-up-time 0.5 --measurement-time 1
 ```
+
+Note: benchmark code enforces at least `1,000,000` iterations per scenario, so full runs are intentionally longer.
 

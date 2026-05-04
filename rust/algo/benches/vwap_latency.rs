@@ -10,6 +10,8 @@ use serde::Serialize;
 use algo::algo_order::{AlgoOrder, VwapParams};
 use algo::vwap::VwapAlgorithm;
 
+const MIN_REPORT_SAMPLES: u64 = 1_000_000;
+
 #[derive(Clone, Copy)]
 struct Scenario {
     name: &'static str,
@@ -190,6 +192,10 @@ fn write_report(scenario: Scenario, hist: &Histogram<u64>, samples: u64, childre
     }
 }
 
+fn effective_iters(iters: u64) -> u64 {
+    iters.max(MIN_REPORT_SAMPLES)
+}
+
 fn bench_vwap_latency(c: &mut Criterion) {
     let mut group = c.benchmark_group("vwap_latency");
     group.measurement_time(Duration::from_secs(5));
@@ -199,12 +205,13 @@ fn bench_vwap_latency(c: &mut Criterion) {
         group.throughput(Throughput::Elements(1));
         group.bench_with_input(BenchmarkId::new("parent_to_child", scenario.name), &scenario, |b, s| {
             b.iter_custom(|iters| {
+                let samples = effective_iters(iters);
                 let mut hist = Histogram::<u64>::new_with_bounds(1, 60_000_000_000, 3)
                     .expect("histogram bounds should be valid");
                 let wall_start = Instant::now();
                 let mut total_children = 0u64;
 
-                for i in 0..iters {
+                for i in 0..samples {
                     let (elapsed, children) = run_parent_order(*s, i + 1);
                     let _ = hist.record(elapsed.as_nanos() as u64);
                     total_children += children;
@@ -212,7 +219,7 @@ fn bench_vwap_latency(c: &mut Criterion) {
                 }
 
                 let wall_elapsed = wall_start.elapsed();
-                write_report(*s, &hist, iters, total_children, wall_elapsed);
+                write_report(*s, &hist, samples, total_children, wall_elapsed);
                 wall_elapsed
             });
         });

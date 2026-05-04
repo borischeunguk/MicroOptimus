@@ -13,6 +13,8 @@ use sor::order_request::OrderRequest;
 use sor::router::SmartOrderRouter;
 use sor::venue::VenueConfig;
 
+const MIN_REPORT_SAMPLES: u64 = 1_000_000;
+
 #[derive(Clone, Copy)]
 struct Scenario {
     name: &'static str,
@@ -195,6 +197,10 @@ fn write_report(
     }
 }
 
+fn effective_iters(iters: u64) -> u64 {
+    iters.max(MIN_REPORT_SAMPLES)
+}
+
 fn run_parent_to_route(scenario: Scenario, seed: u64, router: &mut SmartOrderRouter) -> (Duration, u64, Histogram<u64>) {
     let mut rng = Lcg::new(seed);
 
@@ -286,6 +292,7 @@ fn bench_e2e_latency(c: &mut Criterion) {
         group.throughput(Throughput::Elements(1));
         group.bench_with_input(BenchmarkId::new("parent_to_routed_children", scenario.name), &scenario, |b, s| {
             b.iter_custom(|iters| {
+                let samples = effective_iters(iters);
                 let mut router = SmartOrderRouter::new();
                 router.initialize();
                 configure_router(&mut router, *s);
@@ -297,7 +304,7 @@ fn bench_e2e_latency(c: &mut Criterion) {
                 let wall_start = Instant::now();
                 let mut total_children = 0u64;
 
-                for i in 0..iters {
+                for i in 0..samples {
                     let (elapsed, children, child_hist) = run_parent_to_route(*s, i + 1, &mut router);
                     let _ = parent_hist.record(elapsed.as_nanos() as u64);
                     let _ = child_hist_agg.add(&child_hist);
@@ -306,7 +313,7 @@ fn bench_e2e_latency(c: &mut Criterion) {
                 }
 
                 let wall_elapsed = wall_start.elapsed();
-                write_report(*s, &parent_hist, &child_hist_agg, iters, total_children, wall_elapsed);
+                write_report(*s, &parent_hist, &child_hist_agg, samples, total_children, wall_elapsed);
                 wall_elapsed
             });
         });

@@ -11,6 +11,8 @@ use sor::order_request::OrderRequest;
 use sor::router::SmartOrderRouter;
 use sor::venue::VenueConfig;
 
+const MIN_REPORT_SAMPLES: u64 = 1_000_000;
+
 #[derive(Clone, Copy)]
 struct Scenario {
     name: &'static str,
@@ -134,6 +136,10 @@ fn write_report(scenario: Scenario, hist: &Histogram<u64>, samples: u64, elapsed
     }
 }
 
+fn effective_iters(iters: u64) -> u64 {
+    iters.max(MIN_REPORT_SAMPLES)
+}
+
 fn configure_router(router: &mut SmartOrderRouter, scenario: Scenario) {
     router.configure_venue(VenueConfig::new(
         VenueId::Cme,
@@ -183,6 +189,7 @@ fn bench_router_latency(c: &mut Criterion) {
         group.throughput(Throughput::Elements(1));
         group.bench_with_input(BenchmarkId::new("child_route", scenario.name), &scenario, |b, s| {
             b.iter_custom(|iters| {
+                let samples = effective_iters(iters);
                 let mut router = SmartOrderRouter::new();
                 router.initialize();
                 configure_router(&mut router, *s);
@@ -192,7 +199,7 @@ fn bench_router_latency(c: &mut Criterion) {
                     .expect("histogram bounds should be valid");
                 let wall_start = Instant::now();
 
-                for i in 0..iters {
+                for i in 0..samples {
                     let request = make_request(i + 1, *s, &mut rng);
                     let route_start = Instant::now();
                     let decision = router.route_order(black_box(&request));
@@ -202,7 +209,7 @@ fn bench_router_latency(c: &mut Criterion) {
                 }
 
                 let wall_elapsed = wall_start.elapsed();
-                write_report(*s, &hist, iters, wall_elapsed);
+                write_report(*s, &hist, samples, wall_elapsed);
                 wall_elapsed
             });
         });
