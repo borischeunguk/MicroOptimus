@@ -1,0 +1,9 @@
+{
+  "bench": "sor_router_latency",
+  "scenario": "sor_s3_thin_liquidity",
+  "samples": 359150865,
+  "latency_ns_p90": 96,
+  "latency_ns_p99": 96,
+  "latency_ns_p999": 98,
+  "throughput_routes_per_sec": 7179720.63
+}

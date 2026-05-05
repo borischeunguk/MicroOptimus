@@ -1,0 +1,14 @@
+{
+  "bench": "e2e_algo_sor_latency",
+  "scenario": "e2e_s3_thin_liquidity",
+  "samples": 2067802,
+  "parent_latency_ns_p90": 9927,
+  "parent_latency_ns_p99": 16607,
+  "parent_latency_ns_p999": 54847,
+  "child_latency_ns_p90": 98,
+  "child_latency_ns_p99": 102,
+  "child_latency_ns_p999": 139,
+  "throughput_parent_per_sec": 101322.79,
+  "throughput_child_per_sec": 2026455.83,
+  "total_children": 41356040
+}

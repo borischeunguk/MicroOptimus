@@ -1,0 +1,14 @@
+{
+  "bench": "e2e_algo_sor_latency",
+  "scenario": "e2e_s4_large_parent",
+  "samples": 1561988,
+  "parent_latency_ns_p90": 13015,
+  "parent_latency_ns_p99": 22255,
+  "parent_latency_ns_p999": 77375,
+  "child_latency_ns_p90": 96,
+  "child_latency_ns_p99": 100,
+  "child_latency_ns_p999": 157,
+  "throughput_parent_per_sec": 75665.92,
+  "throughput_child_per_sec": 907991.04,
+  "total_children": 18743856
+}

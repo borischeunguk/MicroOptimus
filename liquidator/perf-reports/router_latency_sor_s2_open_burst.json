@@ -1,0 +1,9 @@
+{
+  "bench": "sor_router_latency",
+  "scenario": "sor_s2_open_burst",
+  "samples": 359465351,
+  "latency_ns_p90": 96,
+  "latency_ns_p99": 96,
+  "latency_ns_p999": 98,
+  "throughput_routes_per_sec": 7186289.04
+}
