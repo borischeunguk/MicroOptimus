@@ -1,0 +1,10 @@
+{
+  "bench": "algo_vwap_latency",
+  "scenario": "algo_s3_thin_liquidity",
+  "samples": 3160309,
+  "latency_ns_p90": 6519,
+  "latency_ns_p99": 8791,
+  "latency_ns_p999": 24111,
+  "throughput_parent_per_sec": 157891.5,
+  "throughput_child_per_sec": 3473613.03
+}

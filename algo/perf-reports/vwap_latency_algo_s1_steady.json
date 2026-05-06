@@ -1,0 +1,10 @@
+{
+  "bench": "algo_vwap_latency",
+  "scenario": "algo_s1_steady",
+  "samples": 3987921,
+  "latency_ns_p90": 5315,
+  "latency_ns_p99": 8067,
+  "latency_ns_p999": 23551,
+  "throughput_parent_per_sec": 198743.2,
+  "throughput_child_per_sec": 1391202.42
+}
