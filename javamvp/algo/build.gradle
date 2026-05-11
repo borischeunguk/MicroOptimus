@@ -1,0 +1,13 @@
+plugins {
+    id 'java'
+}
+
+dependencies {
+    implementation project(':common')
+}
+
+tasks.register('runVwapLatency', JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.microoptimus.javamvp.algo.VwapLatencyBenchmark'
+}
+

@@ -1,0 +1,19 @@
+plugins {
+    id 'java'
+}
+
+dependencies {
+    implementation project(':common')
+    implementation project(':algo')
+}
+
+tasks.register('runRouterLatency', JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.microoptimus.javamvp.sor.RouterLatencyBenchmark'
+}
+
+tasks.register('runE2ELatency', JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.microoptimus.javamvp.sor.E2EAlgoSorLatencyBenchmark'
+}
+

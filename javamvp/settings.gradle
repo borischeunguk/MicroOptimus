@@ -1,0 +1,6 @@
+rootProject.name = 'javamvp'
+
+include 'common'
+include 'algo'
+include 'sor'
+
