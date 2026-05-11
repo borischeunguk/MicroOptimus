@@ -7,7 +7,7 @@ This crate contains Rust MVP algorithmic execution components for MicroOptimus.
 Criterion benchmarks are provided for VWAP parent-to-child latency and throughput.
 
 - Benchmark file: `benches/vwap_latency.rs`
-- Report output: `perf-reports/vwap_latency_<scenario>.json`
+- Report output: `perf-reports/rust_aeron_vwap_latency_<scenario>.json`
 - Metrics: `latency_ns_p90`, `latency_ns_p99`, `latency_ns_p999`, parent/sec, child/sec
 - Minimum parent samples per scenario: `1,000,000` (for stable comparisons)
 

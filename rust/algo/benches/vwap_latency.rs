@@ -165,7 +165,7 @@ fn run_parent_order(scenario: Scenario, seed: u64) -> (Duration, u64) {
 fn report_path(scenario: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("perf-reports")
-        .join(format!("vwap_latency_{scenario}.json"))
+        .join(format!("rust_aeron_vwap_latency_{scenario}.json"))
 }
 
 fn write_report(scenario: Scenario, hist: &Histogram<u64>, samples: u64, children: u64, elapsed: Duration) {

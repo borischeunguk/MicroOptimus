@@ -159,7 +159,7 @@ fn configure_router(router: &mut SmartOrderRouter, scenario: Scenario) {
 fn report_path(scenario: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("perf-reports")
-        .join(format!("e2e_algo_sor_latency_{scenario}.json"))
+        .join(format!("rust_aeron_e2e_algo_sor_latency_{scenario}.json"))
 }
 
 fn write_report(

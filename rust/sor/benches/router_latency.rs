@@ -110,7 +110,7 @@ fn scenarios() -> [Scenario; 4] {
 fn report_path(scenario: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("perf-reports")
-        .join(format!("router_latency_{scenario}.json"))
+        .join(format!("rust_aeron_router_latency_{scenario}.json"))
 }
 
 fn write_report(scenario: Scenario, hist: &Histogram<u64>, samples: u64, elapsed: Duration) {

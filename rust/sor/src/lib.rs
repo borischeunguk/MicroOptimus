@@ -1,3 +1,4 @@
+pub mod cluster_service;
 pub mod order_request;
 pub mod risk;
 pub mod router;

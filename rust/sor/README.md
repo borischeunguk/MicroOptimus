@@ -8,7 +8,7 @@ Criterion benchmarks are provided for SOR-only and end-to-end algo+SOR latency.
 
 - SOR-only benchmark: `benches/router_latency.rs`
 - End-to-end benchmark: `benches/e2e_algo_sor_latency.rs`
-- Report output: `perf-reports/*.json`
+- Report output: `perf-reports/rust_aeron_*.json`
 - Metrics include p90/p99/p99.9 latency and throughput.
 - Minimum parent/route samples per scenario: `1,000,000` (for stable comparisons)
 
