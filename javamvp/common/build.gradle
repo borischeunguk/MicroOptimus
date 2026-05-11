@@ -2,3 +2,7 @@ plugins {
     id 'java-library'
 }
 
+dependencies {
+    api 'io.aeron:aeron-all:1.44.1'
+    api 'org.agrona:agrona:1.21.1'
+}

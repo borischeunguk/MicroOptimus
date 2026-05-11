@@ -27,7 +27,7 @@ public final class SbeMessages {
         public long maxSliceSize;
 
         public byte[] encode() {
-            ByteBuffer bb = ByteBuffer.allocate(96).order(ByteOrder.LITTLE_ENDIAN);
+            ByteBuffer bb = ByteBuffer.allocate(104).order(ByteOrder.LITTLE_ENDIAN);
             bb.putLong(sequenceId);
             bb.putLong(parentOrderId);
             bb.putLong(clientId);

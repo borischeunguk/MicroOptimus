@@ -1,19 +1,46 @@
 plugins {
     id 'java'
+    id 'me.champeau.jmh' version '0.7.2'
 }
+
+def benchmarkSamples = (project.findProperty('javamvpSamples') ?: '1000000').toString()
 
 dependencies {
     implementation project(':common')
     implementation project(':algo')
+    implementation 'org.hdrhistogram:HdrHistogram:2.2.2'
+
+    jmh project(':common')
+    jmh project(':algo')
+    jmh 'org.openjdk.jmh:jmh-core:1.37'
+    jmh 'org.openjdk.jmh:jmh-generator-annprocess:1.37'
+    jmh 'org.hdrhistogram:HdrHistogram:2.2.2'
 }
 
-tasks.register('runRouterLatency', JavaExec) {
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'com.microoptimus.javamvp.sor.RouterLatencyBenchmark'
+jmh {
+    warmupIterations = 0
+    iterations = 1
+    fork = 1
+    benchmarkMode = ['avgt']
+    timeUnit = 'ns'
+    failOnError = true
+    jvmArgsAppend = [
+        '--add-opens=java.base/sun.nio.ch=ALL-UNNAMED',
+        "-Djavamvp.samples=${benchmarkSamples}",
+        '-Djmh.ignoreLock=true'
+    ]
 }
 
-tasks.register('runE2ELatency', JavaExec) {
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'com.microoptimus.javamvp.sor.E2EAlgoSorLatencyBenchmark'
+tasks.register('runRouterLatency') {
+    dependsOn tasks.named('jmh')
+    doFirst {
+        project.extensions.getByType(me.champeau.jmh.JmhParameters).includes = ['com.microoptimus.javamvp.sor.jmh.RouterLatencyJmh']
+    }
 }
 
+tasks.register('runE2ELatency') {
+    dependsOn tasks.named('jmh')
+    doFirst {
+        project.extensions.getByType(me.champeau.jmh.JmhParameters).includes = ['com.microoptimus.javamvp.sor.jmh.E2EAlgoSorLatencyJmh']
+    }
+}

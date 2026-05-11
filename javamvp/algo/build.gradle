@@ -1,13 +1,35 @@
 plugins {
     id 'java'
+    id 'me.champeau.jmh' version '0.7.2'
 }
+
+def benchmarkSamples = (project.findProperty('javamvpSamples') ?: '1000000').toString()
 
 dependencies {
     implementation project(':common')
+    implementation 'org.hdrhistogram:HdrHistogram:2.2.2'
+
+    jmh project(':common')
+    jmh 'org.openjdk.jmh:jmh-core:1.37'
+    jmh 'org.openjdk.jmh:jmh-generator-annprocess:1.37'
+    jmh 'org.hdrhistogram:HdrHistogram:2.2.2'
 }
 
-tasks.register('runVwapLatency', JavaExec) {
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'com.microoptimus.javamvp.algo.VwapLatencyBenchmark'
+jmh {
+    warmupIterations = 0
+    iterations = 1
+    fork = 1
+    benchmarkMode = ['avgt']
+    timeUnit = 'ns'
+    includes = ['com.microoptimus.javamvp.algo.jmh.VwapLatencyJmh']
+    failOnError = true
+    jvmArgsAppend = [
+        '--add-opens=java.base/sun.nio.ch=ALL-UNNAMED',
+        "-Djavamvp.samples=${benchmarkSamples}",
+        '-Djmh.ignoreLock=true'
+    ]
 }
 
+tasks.register('runVwapLatency') {
+    dependsOn tasks.named('jmh')
+}
