@@ -19,12 +19,12 @@ impl<S: ClusterSubscriber, P: ClusterPublisher> SorClusterService<S, P> {
     pub fn new(subscriber: S, publisher: P) -> Self {
         let mut router = SmartOrderRouter::new();
         router.initialize();
-        Self {
-            subscriber,
-            publisher,
-            router,
-            route_seq: 1,
-        }
+        Self { subscriber, publisher, router, route_seq: 1 }
+    }
+
+    /// Construct with a pre-configured router (e.g. benchmarks that need specific venue configs).
+    pub fn new_with_router(subscriber: S, publisher: P, router: SmartOrderRouter) -> Self {
+        Self { subscriber, publisher, router, route_seq: 1 }
     }
 
     pub fn poll(&mut self, region: &mut SharedRegion) -> u64 {

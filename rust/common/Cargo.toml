@@ -3,6 +3,11 @@ name = "common"
 version.workspace = true
 edition.workspace = true
 
+[features]
+aeron = ["dep:rusteron-client", "dep:rusteron-media-driver"]
+
 [dependencies]
 memmap2.workspace = true
 crossbeam-utils.workspace = true
+rusteron-client = { workspace = true, optional = true }
+rusteron-media-driver = { workspace = true, optional = true }

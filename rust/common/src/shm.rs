@@ -54,6 +54,32 @@ impl SharedRegion {
         }
     }
 
+    pub fn open_existing<P: AsRef<Path>>(path: P, region_id: u32, capacity: usize) -> Self {
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(path)
+            .expect("failed to open existing shared mmap file");
+        let expected_len = (HEADER_SIZE + capacity) as u64;
+        let actual_len = file
+            .metadata()
+            .expect("failed to read mmap file metadata")
+            .len();
+        assert_eq!(
+            actual_len, expected_len,
+            "shared mmap file size mismatch: expected {expected_len}, got {actual_len}"
+        );
+
+        let mmap = unsafe { MmapMut::map_mut(&file).expect("failed to map shared region file") };
+        Self {
+            mmap,
+            region_id,
+            capacity,
+            write_pos: 0,
+            seq: 1,
+        }
+    }
+
     pub fn write(&mut self, msg_type: u16, payload: &[u8]) -> Option<ShmRef> {
         let frame_len = align_up(payload.len());
         if frame_len > self.capacity {
