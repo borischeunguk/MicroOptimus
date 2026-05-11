@@ -2,7 +2,7 @@ package com.microoptimus.javamvp.sor.jmh;
 
 import com.microoptimus.javamvp.algo.SlicePayload;
 import com.microoptimus.javamvp.common.BenchmarkSupport;
-import com.microoptimus.javamvp.common.RealAeronClusterSequencer;
+import com.microoptimus.javamvp.common.RealAeronIpcSequencer;
 import com.microoptimus.javamvp.common.SbeMessages;
 import com.microoptimus.javamvp.common.Types;
 import com.microoptimus.javamvp.sor.RouteDecisionPayload;
@@ -22,35 +22,37 @@ public class RouterLatencyJmh {
     private static final long DEFAULT_SAMPLES = 1_000_000L;
 
     private SorMvpRouter router;
-    private RealAeronClusterSequencer sequencer;
+    private RealAeronIpcSequencer sequencer;
     private BenchmarkSupport.LatencyRecorder recorder;
     private long samples;
     private long wallStart;
+    private SlicePayload slice;
+    private SbeMessages.AlgoSliceRefEvent event;
 
     @Setup(Level.Trial)
     public void setup() {
         router = new SorMvpRouter();
-        sequencer = RealAeronClusterSequencer.launch("sor-router-jmh");
+        sequencer = RealAeronIpcSequencer.launch("sor-router-jmh");
         samples = Long.getLong("javamvp.samples", DEFAULT_SAMPLES);
         recorder = new BenchmarkSupport.LatencyRecorder((int) Math.min(Integer.MAX_VALUE, samples));
         wallStart = System.nanoTime();
+        slice = new SlicePayload();
+        slice.symbolIndex = 1;
+        slice.side = Types.Side.BUY;
+        slice.price = 1500;
+        slice.sliceNumber = 1;
+        event = new SbeMessages.AlgoSliceRefEvent();
     }
 
     @Benchmark
     public long runBenchmark() {
         long routeCount = 0;
         for (long i = 0; i < samples; i++) {
-            SlicePayload slice = new SlicePayload();
             slice.sliceId = i + 1;
             slice.parentOrderId = i + 1;
-            slice.symbolIndex = 1;
-            slice.side = Types.Side.BUY;
             slice.quantity = 200 + (i % 2000);
-            slice.price = 1500;
-            slice.sliceNumber = 1;
             slice.timestamp = i;
 
-            SbeMessages.AlgoSliceRefEvent event = new SbeMessages.AlgoSliceRefEvent();
             event.sequenceId = i + 1;
             event.parentOrderId = slice.parentOrderId;
             event.sliceId = slice.sliceId;

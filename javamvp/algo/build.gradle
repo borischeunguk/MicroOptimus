@@ -4,6 +4,7 @@ plugins {
 }
 
 def benchmarkSamples = (project.findProperty('javamvpSamples') ?: '1000000').toString()
+def benchmarkIterationTime = (project.findProperty('javamvpIterationTime') ?: '10s').toString()
 
 dependencies {
     implementation project(':common')
@@ -19,6 +20,7 @@ jmh {
     warmupIterations = 0
     iterations = 1
     fork = 1
+    timeOnIteration = benchmarkIterationTime
     benchmarkMode = ['avgt']
     timeUnit = 'ns'
     includes = ['com.microoptimus.javamvp.algo.jmh.VwapLatencyJmh']

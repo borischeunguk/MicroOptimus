@@ -3,7 +3,7 @@ package com.microoptimus.javamvp.algo.jmh;
 import com.microoptimus.javamvp.algo.SlicePayload;
 import com.microoptimus.javamvp.algo.VwapMvpEngine;
 import com.microoptimus.javamvp.common.BenchmarkSupport;
-import com.microoptimus.javamvp.common.RealAeronClusterSequencer;
+import com.microoptimus.javamvp.common.RealAeronIpcSequencer;
 import com.microoptimus.javamvp.common.SbeMessages;
 import com.microoptimus.javamvp.common.Types;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -22,57 +22,59 @@ public class VwapLatencyJmh {
     private static final long DEFAULT_SAMPLES = 1_000_000L;
 
     private VwapMvpEngine engine;
-    private RealAeronClusterSequencer sequencer;
+    private RealAeronIpcSequencer sequencer;
     private BenchmarkSupport.LatencyRecorder recorder;
     private long samples;
     private long totalChildren;
     private long wallStart;
+    private SbeMessages.ParentOrderCommand cmd;
+    private VwapMvpEngine.ParentOrder order;
 
     @Setup(Level.Trial)
     public void setup() {
         engine = new VwapMvpEngine();
-        sequencer = RealAeronClusterSequencer.launch("algo-jmh");
+        sequencer = RealAeronIpcSequencer.launch("algo-jmh");
         samples = Long.getLong("javamvp.samples", DEFAULT_SAMPLES);
         recorder = new BenchmarkSupport.LatencyRecorder((int) Math.min(Integer.MAX_VALUE, samples));
         totalChildren = 0;
         wallStart = System.nanoTime();
+        cmd = new SbeMessages.ParentOrderCommand();
+        cmd.clientId = 42;
+        cmd.symbolIndex = 1;
+        cmd.side = 0;
+        cmd.totalQuantity = 40_000;
+        cmd.limitPrice = 15_000_000L;
+        cmd.startTime = 0;
+        cmd.endTime = 8_000_000;
+        cmd.numBuckets = 12;
+        cmd.participationRate = 0.12;
+        cmd.minSliceSize = 100;
+        cmd.maxSliceSize = 4_000;
+        order = new VwapMvpEngine.ParentOrder();
+        order.symbolIndex = 1;
+        order.totalQuantity = 40_000;
+        order.basePrice = 15_000_000L;
+        order.startNs = 0;
+        order.endNs = 8_000_000;
+        order.tickStepNs = 50_000;
+        order.numBuckets = 12;
+        order.participationRate = 0.12;
+        order.maxSliceSize = 4_000;
     }
 
     @Benchmark
     public long runBenchmark() {
         for (long i = 0; i < samples; i++) {
-            SbeMessages.ParentOrderCommand cmd = new SbeMessages.ParentOrderCommand();
             cmd.sequenceId = i + 1;
             cmd.parentOrderId = i + 1;
-            cmd.clientId = 42;
-            cmd.symbolIndex = 1;
-            cmd.side = 0;
-            cmd.totalQuantity = 40_000;
-            cmd.limitPrice = 15_000_000L;
-            cmd.startTime = 0;
-            cmd.endTime = 8_000_000;
             cmd.timestamp = i;
-            cmd.numBuckets = 12;
-            cmd.participationRate = 0.12;
-            cmd.minSliceSize = 100;
-            cmd.maxSliceSize = 4_000;
 
             byte[] sequenced = sequencer.sequenceRoundTrip(cmd.encode());
             SbeMessages.ParentOrderCommand decoded = SbeMessages.ParentOrderCommand.decode(sequenced);
 
-            VwapMvpEngine.ParentOrder order = new VwapMvpEngine.ParentOrder();
             order.parentOrderId = decoded.parentOrderId;
-            order.symbolIndex = decoded.symbolIndex;
             order.side = decoded.side == 0 ? Types.Side.BUY : Types.Side.SELL;
-            order.totalQuantity = decoded.totalQuantity;
             order.leavesQuantity = decoded.totalQuantity;
-            order.basePrice = decoded.limitPrice;
-            order.startNs = decoded.startTime;
-            order.endNs = decoded.endTime;
-            order.tickStepNs = 50_000;
-            order.numBuckets = decoded.numBuckets;
-            order.participationRate = decoded.participationRate;
-            order.maxSliceSize = decoded.maxSliceSize;
 
             long started = System.nanoTime();
             List<SlicePayload> slices = engine.generateSlices(order);

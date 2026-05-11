@@ -2,9 +2,9 @@
   "bench": "algo_vwap_latency",
   "scenario": "algo_s1_steady",
   "samples": 1000000,
-  "latency_ns_p90": 1253,
-  "latency_ns_p99": 4272,
-  "latency_ns_p999": 14672,
-  "throughput_parent_per_sec": 891426.764246733,
-  "throughput_child_per_sec": 8.91426764246733E7
+  "latency_ns_p90": 1005,
+  "latency_ns_p99": 2427,
+  "latency_ns_p999": 5408,
+  "throughput_parent_per_sec": 99514.50955856992,
+  "throughput_child_per_sec": 4.9757254779284954E7
 }

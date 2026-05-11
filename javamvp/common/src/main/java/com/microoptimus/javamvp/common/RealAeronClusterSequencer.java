@@ -13,6 +13,7 @@ import java.io.File;
 import java.net.ServerSocket;
 import java.util.ArrayDeque;
 import java.util.Queue;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Single-node real Aeron Cluster harness with a sequencer service.
@@ -31,21 +32,27 @@ public final class RealAeronClusterSequencer implements AutoCloseable {
         int logPort = freePort();
         int catchupPort = freePort();
         int archiveControlPort = freePort();
+        int archiveRecordingEventsPort = freePort();
         int ingressPort = freePort();
 
-        File clusterDir = new File(System.getProperty("java.io.tmpdir"), "javamvp-cluster-" + uniqueId + "-" + ingressPort);
-        File archiveDir = new File(System.getProperty("java.io.tmpdir"), "javamvp-archive-" + uniqueId + "-" + archiveControlPort);
+        String runId = uniqueId + "-" + System.nanoTime() + "-" + ThreadLocalRandom.current().nextInt(1_000_000);
+        String aeronDirName = new File(System.getProperty("java.io.tmpdir"), "javamvp-aeron-" + runId).getAbsolutePath();
+        File clusterDir = new File(System.getProperty("java.io.tmpdir"), "javamvp-cluster-" + runId);
+        File archiveDir = new File(System.getProperty("java.io.tmpdir"), "javamvp-archive-" + runId);
         clusterDir.mkdirs();
         archiveDir.mkdirs();
 
         MediaDriver.Context mediaDriverContext = new MediaDriver.Context()
+            .aeronDirectoryName(aeronDirName)
             .threadingMode(io.aeron.driver.ThreadingMode.SHARED)
             .termBufferSparseFile(false)
             .dirDeleteOnStart(true)
             .dirDeleteOnShutdown(true);
 
         io.aeron.archive.Archive.Context archiveContext = new io.aeron.archive.Archive.Context()
+            .aeronDirectoryName(aeronDirName)
             .controlChannel("aeron:udp?endpoint=localhost:" + archiveControlPort)
+            .recordingEventsChannel("aeron:udp?endpoint=localhost:" + archiveRecordingEventsPort)
             .replicationChannel("aeron:udp?endpoint=localhost:0")
             .localControlChannel("aeron:ipc")
             .archiveDir(archiveDir)
@@ -62,6 +69,7 @@ public final class RealAeronClusterSequencer implements AutoCloseable {
             .clusterMemberId(0)
             .clusterMembers(members)
             .appointedLeaderId(0)
+            .aeronDirectoryName(aeronDirName)
             .clusterDir(clusterDir)
             .ingressChannel("aeron:udp?endpoint=localhost:" + ingressPort)
             .logChannel("aeron:udp?control-mode=manual")
@@ -72,10 +80,77 @@ public final class RealAeronClusterSequencer implements AutoCloseable {
 
         ClusteredServiceContainer.Context serviceCtx = new ClusteredServiceContainer.Context()
             .clusteredService(new RealSequencerService())
+            .aeronDirectoryName(aeronDirName)
             .clusterDir(clusterDir);
         ClusteredServiceContainer container = ClusteredServiceContainer.launch(serviceCtx);
 
-        RealAeronClusterSequencer holder = new RealAeronClusterSequencer(cmd, container, ingressPort);
+        RealAeronClusterSequencer holder = new RealAeronClusterSequencer(cmd, container, ingressPort, aeronDirName);
+        holder.awaitClientConnection();
+        return holder;
+    }
+
+    /**
+     * Like {@link #launch} but uses aeron:ipc for client↔cluster ingress/egress,
+     * eliminating UDP socket overhead. Suitable for single-node in-process benchmarks.
+     */
+    public static RealAeronClusterSequencer launchIpc(String uniqueId) {
+        int memberPort = freePort();
+        int transferPort = freePort();
+        int logPort = freePort();
+        int catchupPort = freePort();
+        int archiveControlPort = freePort();
+        int archiveRecordingEventsPort = freePort();
+
+        String runId = uniqueId + "-" + System.nanoTime() + "-" + ThreadLocalRandom.current().nextInt(1_000_000);
+        String aeronDirName = new File(System.getProperty("java.io.tmpdir"), "javamvp-aeron-" + runId).getAbsolutePath();
+        File clusterDir = new File(System.getProperty("java.io.tmpdir"), "javamvp-cluster-" + runId);
+        File archiveDir = new File(System.getProperty("java.io.tmpdir"), "javamvp-archive-" + runId);
+        clusterDir.mkdirs();
+        archiveDir.mkdirs();
+
+        MediaDriver.Context mediaDriverContext = new MediaDriver.Context()
+            .aeronDirectoryName(aeronDirName)
+            .threadingMode(io.aeron.driver.ThreadingMode.SHARED)
+            .termBufferSparseFile(false)
+            .dirDeleteOnStart(true)
+            .dirDeleteOnShutdown(true);
+
+        io.aeron.archive.Archive.Context archiveContext = new io.aeron.archive.Archive.Context()
+            .aeronDirectoryName(aeronDirName)
+            .controlChannel("aeron:udp?endpoint=localhost:" + archiveControlPort)
+            .recordingEventsChannel("aeron:udp?endpoint=localhost:" + archiveRecordingEventsPort)
+            .replicationChannel("aeron:udp?endpoint=localhost:0")
+            .localControlChannel("aeron:ipc")
+            .archiveDir(archiveDir)
+            .deleteArchiveOnStart(true);
+
+        String members = "0,localhost:" + memberPort
+            + ",localhost:" + transferPort
+            + ",localhost:" + logPort
+            + ",localhost:" + catchupPort
+            + ",localhost:" + archiveControlPort;
+
+        ConsensusModule.Context consensusModuleContext = new ConsensusModule.Context()
+            .clusterId(0)
+            .clusterMemberId(0)
+            .clusterMembers(members)
+            .appointedLeaderId(0)
+            .aeronDirectoryName(aeronDirName)
+            .clusterDir(clusterDir)
+            .ingressChannel("aeron:ipc")
+            .logChannel("aeron:udp?control-mode=manual")
+            .replicationChannel("aeron:udp?endpoint=localhost:0")
+            .deleteDirOnStart(true);
+
+        ClusteredMediaDriver cmd = ClusteredMediaDriver.launch(mediaDriverContext, archiveContext, consensusModuleContext);
+
+        ClusteredServiceContainer.Context serviceCtx = new ClusteredServiceContainer.Context()
+            .clusteredService(new RealSequencerService())
+            .aeronDirectoryName(aeronDirName)
+            .clusterDir(clusterDir);
+        ClusteredServiceContainer container = ClusteredServiceContainer.launch(serviceCtx);
+
+        RealAeronClusterSequencer holder = new RealAeronClusterSequencer(cmd, container, aeronDirName, runId);
         holder.awaitClientConnection();
         return holder;
     }
@@ -89,14 +164,41 @@ public final class RealAeronClusterSequencer implements AutoCloseable {
         }
     }
 
-    private RealAeronClusterSequencer(ClusteredMediaDriver cmd, ClusteredServiceContainer serviceContainer, int ingressPort) {
+    private RealAeronClusterSequencer(
+        ClusteredMediaDriver cmd,
+        ClusteredServiceContainer serviceContainer,
+        int ingressPort,
+        String aeronDirName
+    ) {
         this.clusteredMediaDriver = cmd;
         this.serviceContainer = serviceContainer;
         this.client = AeronCluster.connect(
             new AeronCluster.Context()
+                .aeronDirectoryName(aeronDirName)
                 .ingressChannel("aeron:udp")
                 .ingressEndpoints("0=localhost:" + ingressPort)
                 .egressChannel("aeron:udp?endpoint=localhost:0")
+                .egressListener((clusterSessionId, timestamp, buffer, offset, length, header) -> {
+                    byte[] out = new byte[length];
+                    buffer.getBytes(offset, out);
+                    egressQueue.add(out);
+                })
+        );
+    }
+
+    private RealAeronClusterSequencer(
+        ClusteredMediaDriver cmd,
+        ClusteredServiceContainer serviceContainer,
+        String aeronDirName,
+        String runId
+    ) {
+        this.clusteredMediaDriver = cmd;
+        this.serviceContainer = serviceContainer;
+        this.client = AeronCluster.connect(
+            new AeronCluster.Context()
+                .aeronDirectoryName(aeronDirName)
+                .ingressChannel("aeron:ipc")
+                .egressChannel("aeron:ipc?alias=cluster-egress-" + runId)
                 .egressListener((clusterSessionId, timestamp, buffer, offset, length, header) -> {
                     byte[] out = new byte[length];
                     buffer.getBytes(offset, out);

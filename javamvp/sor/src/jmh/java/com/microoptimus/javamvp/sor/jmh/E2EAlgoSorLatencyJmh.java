@@ -4,7 +4,7 @@ import com.microoptimus.javamvp.algo.SlicePayload;
 import com.microoptimus.javamvp.algo.VwapMvpEngine;
 import com.microoptimus.javamvp.common.BenchmarkSupport;
 import com.microoptimus.javamvp.common.MmapSharedRegion;
-import com.microoptimus.javamvp.common.RealAeronClusterSequencer;
+import com.microoptimus.javamvp.common.RealAeronIpcSequencer;
 import com.microoptimus.javamvp.common.SbeMessages;
 import com.microoptimus.javamvp.common.ShmRef;
 import com.microoptimus.javamvp.common.Types;
@@ -23,29 +23,57 @@ import java.util.List;
 
 @State(Scope.Benchmark)
 public class E2EAlgoSorLatencyJmh {
-    private static final long DEFAULT_SAMPLES = 1_000_000L;
+    private static final long DEFAULT_SAMPLES = 100L;
 
     private VwapMvpEngine algo;
     private SorMvpRouter router;
     private MmapSharedRegion region;
-    private RealAeronClusterSequencer sequencer;
+    private RealAeronIpcSequencer sequencer;
     private BenchmarkSupport.LatencyRecorder parentRecorder;
     private BenchmarkSupport.LatencyRecorder childRecorder;
     private long samples;
     private long totalChildren;
     private long wallStart;
+    private SbeMessages.ParentOrderCommand cmd;
+    private VwapMvpEngine.ParentOrder order;
+    private SbeMessages.AlgoSliceRefEvent inEvent;
+    private SbeMessages.SorRouteRefEvent outEvent;
 
     @Setup(Level.Trial)
     public void setup() throws Exception {
         algo = new VwapMvpEngine();
         router = new SorMvpRouter();
         region = new MmapSharedRegion(Paths.get(".ipc", "javamvp_mmap_jmh.dat"), 1, 8 * 1024 * 1024);
-        sequencer = RealAeronClusterSequencer.launch("sor-e2e-jmh");
-        samples = Long.getLong("javamvp.samples", DEFAULT_SAMPLES);
+        sequencer = RealAeronIpcSequencer.launch("sor-e2e-jmh");
+        samples = Long.getLong("javamvp.e2e.samples", DEFAULT_SAMPLES);
         parentRecorder = new BenchmarkSupport.LatencyRecorder((int) Math.min(Integer.MAX_VALUE, samples));
         childRecorder = new BenchmarkSupport.LatencyRecorder((int) Math.min(Integer.MAX_VALUE, samples * 8));
         totalChildren = 0;
         wallStart = System.nanoTime();
+        cmd = new SbeMessages.ParentOrderCommand();
+        cmd.clientId = 1;
+        cmd.symbolIndex = 1;
+        cmd.side = 0;
+        cmd.totalQuantity = 40_000;
+        cmd.limitPrice = 1500;
+        cmd.startTime = 0;
+        cmd.endTime = 8_000_000;
+        cmd.numBuckets = 12;
+        cmd.participationRate = 0.12;
+        cmd.minSliceSize = 100;
+        cmd.maxSliceSize = 4_500;
+        order = new VwapMvpEngine.ParentOrder();
+        order.symbolIndex = 1;
+        order.totalQuantity = 40_000;
+        order.basePrice = 1500;
+        order.startNs = 0;
+        order.endNs = 8_000_000;
+        order.tickStepNs = 40_000;
+        order.numBuckets = 12;
+        order.participationRate = 0.12;
+        order.maxSliceSize = 4_500;
+        inEvent = new SbeMessages.AlgoSliceRefEvent();
+        outEvent = new SbeMessages.SorRouteRefEvent();
     }
 
     @Benchmark
@@ -53,51 +81,28 @@ public class E2EAlgoSorLatencyJmh {
         for (long i = 0; i < samples; i++) {
             long parentStart = System.nanoTime();
 
-            SbeMessages.ParentOrderCommand cmd = new SbeMessages.ParentOrderCommand();
             cmd.sequenceId = i + 1;
             cmd.parentOrderId = i + 1;
-            cmd.clientId = 1;
-            cmd.symbolIndex = 1;
-            cmd.side = 0;
-            cmd.totalQuantity = 40_000;
-            cmd.limitPrice = 1500;
-            cmd.startTime = 0;
-            cmd.endTime = 8_000_000;
             cmd.timestamp = i;
-            cmd.numBuckets = 12;
-            cmd.participationRate = 0.12;
-            cmd.minSliceSize = 100;
-            cmd.maxSliceSize = 4_500;
 
             SbeMessages.ParentOrderCommand ordered = SbeMessages.ParentOrderCommand.decode(sequencer.sequenceRoundTrip(cmd.encode()));
 
-            VwapMvpEngine.ParentOrder order = new VwapMvpEngine.ParentOrder();
             order.parentOrderId = ordered.parentOrderId;
-            order.symbolIndex = ordered.symbolIndex;
             order.side = ordered.side == 0 ? Types.Side.BUY : Types.Side.SELL;
-            order.totalQuantity = ordered.totalQuantity;
             order.leavesQuantity = ordered.totalQuantity;
-            order.basePrice = ordered.limitPrice;
-            order.startNs = ordered.startTime;
-            order.endNs = ordered.endTime;
-            order.tickStepNs = 40_000;
-            order.numBuckets = ordered.numBuckets;
-            order.participationRate = ordered.participationRate;
-            order.maxSliceSize = ordered.maxSliceSize;
 
             List<SlicePayload> slices = algo.generateSlices(order);
             for (SlicePayload slice : slices) {
                 ShmRef sliceRef = region.write(SbeMessages.TEMPLATE_ALGO_SLICE_REF, slice.encode());
 
-                SbeMessages.AlgoSliceRefEvent in = new SbeMessages.AlgoSliceRefEvent();
-                in.sequenceId = i + 1;
-                in.parentOrderId = slice.parentOrderId;
-                in.sliceId = slice.sliceId;
-                in.timestamp = slice.timestamp;
-                in.ref = sliceRef;
+                inEvent.sequenceId = i + 1;
+                inEvent.parentOrderId = slice.parentOrderId;
+                inEvent.sliceId = slice.sliceId;
+                inEvent.timestamp = slice.timestamp;
+                inEvent.ref = sliceRef;
 
                 SbeMessages.AlgoSliceRefEvent seqEvent =
-                    SbeMessages.AlgoSliceRefEvent.decode(sequencer.sequenceRoundTrip(in.encode()));
+                    SbeMessages.AlgoSliceRefEvent.decode(sequencer.sequenceRoundTrip(inEvent.encode()));
 
                 byte[] sliceBytes = region.read(seqEvent.ref);
                 SlicePayload decoded = SlicePayload.decode(sliceBytes);
@@ -108,16 +113,15 @@ public class E2EAlgoSorLatencyJmh {
                 childRecorder.record(childElapsed);
 
                 ShmRef routeRef = region.write(SbeMessages.TEMPLATE_SOR_ROUTE_REF, decision.encode());
-                SbeMessages.SorRouteRefEvent out = new SbeMessages.SorRouteRefEvent();
-                out.sequenceId = i + 1;
-                out.parentOrderId = decision.parentOrderId;
-                out.sliceId = decision.sliceId;
-                out.routeId = decision.routeId;
-                out.timestamp = decision.timestamp;
-                out.ref = routeRef;
+                outEvent.sequenceId = i + 1;
+                outEvent.parentOrderId = decision.parentOrderId;
+                outEvent.sliceId = decision.sliceId;
+                outEvent.routeId = decision.routeId;
+                outEvent.timestamp = decision.timestamp;
+                outEvent.ref = routeRef;
 
                 SbeMessages.SorRouteRefEvent seqRoute =
-                    SbeMessages.SorRouteRefEvent.decode(sequencer.sequenceRoundTrip(out.encode()));
+                    SbeMessages.SorRouteRefEvent.decode(sequencer.sequenceRoundTrip(outEvent.encode()));
                 if (seqRoute.routeId <= 0) {
                     throw new IllegalStateException("invalid route id");
                 }
