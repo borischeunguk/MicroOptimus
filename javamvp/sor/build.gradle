@@ -38,13 +38,23 @@ jmh {
 tasks.register('runRouterLatency') {
     dependsOn tasks.named('jmh')
     doFirst {
-        project.extensions.getByType(me.champeau.jmh.JmhParameters).includes = ['com.microoptimus.javamvp.sor.jmh.RouterLatencyJmh']
+        def params = project.extensions.getByType(me.champeau.jmh.JmhParameters)
+        params.includes = ['.*RouterLatencyJmh.*']
+        params.excludes = ['.*E2EAlgoSorLatencyJmh.*']
     }
 }
 
 tasks.register('runE2ELatency') {
     dependsOn tasks.named('jmh')
     doFirst {
-        project.extensions.getByType(me.champeau.jmh.JmhParameters).includes = ['com.microoptimus.javamvp.sor.jmh.E2EAlgoSorLatencyJmh']
+        def params = project.extensions.getByType(me.champeau.jmh.JmhParameters)
+        params.includes = ['.*E2EAlgoSorLatencyJmh.*']
+        params.excludes = ['.*RouterLatencyJmh.*']
     }
 }
+
+tasks.register('runSorE2eService', JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.microoptimus.javamvp.sor.SorE2eServiceMain'
+}
+

@@ -35,3 +35,9 @@ jmh {
 tasks.register('runVwapLatency') {
     dependsOn tasks.named('jmh')
 }
+
+tasks.register('runAlgoE2eService', JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.microoptimus.javamvp.algo.AlgoE2eServiceMain'
+}
+

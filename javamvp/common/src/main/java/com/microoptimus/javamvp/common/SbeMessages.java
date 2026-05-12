@@ -9,6 +9,30 @@ public final class SbeMessages {
     public static final int TEMPLATE_PARENT_ORDER = 1;
     public static final int TEMPLATE_ALGO_SLICE_REF = 2;
     public static final int TEMPLATE_SOR_ROUTE_REF = 3;
+    public static final int TEMPLATE_CONTROL = 4;
+
+    public static final class ControlMessage {
+        public long sequenceId;
+        public int serviceId;
+        public int command;
+
+        public byte[] encode() {
+            ByteBuffer bb = ByteBuffer.allocate(16).order(ByteOrder.LITTLE_ENDIAN);
+            bb.putLong(sequenceId);
+            bb.putInt(serviceId);
+            bb.putInt(command);
+            return bb.array();
+        }
+
+        public static ControlMessage decode(byte[] data) {
+            ByteBuffer bb = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
+            ControlMessage m = new ControlMessage();
+            m.sequenceId = bb.getLong();
+            m.serviceId = bb.getInt();
+            m.command = bb.getInt();
+            return m;
+        }
+    }
 
     public static final class ParentOrderCommand {
         public long sequenceId;
