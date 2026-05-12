@@ -342,6 +342,9 @@ fn bench_e2e_latency(c: &mut Criterion) {
                     let mut cmd_pub =
                         AeronClusterPublisher::new("aeron:ipc", parent_cmd_stream)
                             .expect("cmd publisher");
+                    let mut slice_sub =
+                        AeronClusterSubscriber::new("aeron:ipc", algo_slice_stream)
+                            .expect("slice subscriber");
                     let mut route_sub =
                         AeronClusterSubscriber::new("aeron:ipc", sor_route_stream)
                             .expect("route subscriber");
@@ -375,15 +378,30 @@ fn bench_e2e_latency(c: &mut Criterion) {
                             ..ParentOrderCommand::default()
                         };
 
-                        let t = Instant::now();
+                        let parent_start = Instant::now();
                         while !cmd_pub.publish(&cmd.encode()) {
                             assert_running("algo", &mut algo);
                             assert_running("sor", &mut sor);
-                            if t.elapsed() > hop_timeout() {
+                            if parent_start.elapsed() > hop_timeout() {
                                 panic!("timed out publishing parent command to Aeron");
                             }
                             std::hint::spin_loop();
                         }
+
+                        // Observe the emitted slice event to split parent and child latency paths.
+                        let _slice_bytes = loop {
+                            if let Some(b) = slice_sub.poll() {
+                                break b;
+                            }
+                            assert_running("algo", &mut algo);
+                            assert_running("sor", &mut sor);
+                            if parent_start.elapsed() > hop_timeout() {
+                                panic!("timed out waiting for algo slice event from Aeron");
+                            }
+                            std::hint::spin_loop();
+                        };
+
+                        let child_start = Instant::now();
 
                         let _route_bytes = loop {
                             if let Some(b) = route_sub.poll() {
@@ -391,15 +409,16 @@ fn bench_e2e_latency(c: &mut Criterion) {
                             }
                             assert_running("algo", &mut algo);
                             assert_running("sor", &mut sor);
-                            if t.elapsed() > hop_timeout() {
+                            if parent_start.elapsed() > hop_timeout() {
                                 panic!("timed out waiting for SOR route event from Aeron");
                             }
                             std::hint::spin_loop();
                         };
 
-                        let elapsed = t.elapsed().as_nanos() as u64;
-                        let _ = parent_hist.record(elapsed);
-                        let _ = child_hist.record(elapsed);
+                        let parent_elapsed = parent_start.elapsed().as_nanos() as u64;
+                        let child_elapsed = child_start.elapsed().as_nanos() as u64;
+                        let _ = parent_hist.record(parent_elapsed);
+                        let _ = child_hist.record(child_elapsed);
                         total_children += 1;
                     }
 
