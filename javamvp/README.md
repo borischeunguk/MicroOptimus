@@ -15,6 +15,11 @@ cd /Users/xinyue/IdeaProjects/MicroOptimus
 ./gradlew -p javamvp :algo:runVwapLatency :sor:runRouterLatency :sor:runE2ELatency
 ```
 
+```bash
+cd /Users/xinyue/IdeaProjects/MicroOptimus
+./gradlew -p javamvp :sor:runE2ELatency -PjavamvpE2eSamples=100000
+```
+
 ## Expected reports
 
 - `javamvp/algo/perf-reports/java_aeron_vwap_latency_algo_s1_steady.json`
