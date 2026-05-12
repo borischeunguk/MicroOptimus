@@ -36,10 +36,9 @@ MO_AERON_DIR=/tmp/microoptimus_aeron_test cargo test -p sor --features aeron-int
 
 ```bash
 cd /Users/xinyue/IdeaProjects/MicroOptimus/rust
-MO_BENCH_SAMPLES=10 MO_BENCH_WARMUP_SECS=1 MO_BENCH_MEASUREMENT_SECS=1 MO_BENCH_CRITERION_SAMPLE_SIZE=10 MO_BENCH_HOP_TIMEOUT_SECS=20 cargo bench -p algo --bench vwap_latency --features aeron-integration -- --noplot algo_s1_steady
-MO_BENCH_SAMPLES=10 MO_BENCH_WARMUP_SECS=1 MO_BENCH_MEASUREMENT_SECS=1 MO_BENCH_CRITERION_SAMPLE_SIZE=10 MO_BENCH_HOP_TIMEOUT_SECS=20 cargo bench -p sor --bench router_latency --features aeron-integration -- --noplot sor_s1_steady
-MO_BENCH_SAMPLES=10 MO_BENCH_WARMUP_SECS=1 MO_BENCH_MEASUREMENT_SECS=1 MO_BENCH_CRITERION_SAMPLE_SIZE=10 MO_BENCH_HOP_TIMEOUT_SECS=20 cargo bench -p sor --bench e2e_algo_sor_latency --features aeron-integration -- --noplot e2e_s1_steady
-```
+MO_BENCH_SAMPLES=100000 MO_BENCH_WARMUP_SECS=2 MO_BENCH_MEASUREMENT_SECS=5 MO_BENCH_CRITERION_SAMPLE_SIZE=10 MO_BENCH_HOP_TIMEOUT_SECS=600 cargo bench -p algo --bench vwap_latency --features aeron-integration -- --noplot algo_s1_steady
+MO_BENCH_SAMPLES=100000 MO_BENCH_WARMUP_SECS=2 MO_BENCH_MEASUREMENT_SECS=5 MO_BENCH_CRITERION_SAMPLE_SIZE=10 MO_BENCH_HOP_TIMEOUT_SECS=600 cargo bench -p sor --bench router_latency --features aeron-integration -- --noplot sor_s1_steady
+MO_BENCH_SAMPLES=100000 MO_BENCH_WARMUP_SECS=2 MO_BENCH_MEASUREMENT_SECS=5 MO_BENCH_CRITERION_SAMPLE_SIZE=10 MO_BENCH_HOP_TIMEOUT_SECS=600 cargo bench -p sor --bench e2e_algo_sor_latency --features aeron-integration -- --noplot e2e_s1_steady```
 
 Reports (overwritten in-place):
 
