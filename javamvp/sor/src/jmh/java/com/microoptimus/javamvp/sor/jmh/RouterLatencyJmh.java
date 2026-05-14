@@ -60,12 +60,13 @@ public class RouterLatencyJmh {
             event.ref = new com.microoptimus.javamvp.common.ShmRef(1, 2, 0, 0, i + 1);
 
             byte[] sequenced = sequencer.sequenceRoundTrip(event.encode());
+            // just decode + route function time
+            long started = System.nanoTime();
             SbeMessages.AlgoSliceRefEvent decoded = SbeMessages.AlgoSliceRefEvent.decode(sequenced);
             if (decoded.sliceId != slice.sliceId) {
                 throw new IllegalStateException("sequencer mismatch");
             }
 
-            long started = System.nanoTime();
             RouteDecisionPayload decision = router.route(slice);
             long elapsed = System.nanoTime() - started;
             recorder.record(elapsed);

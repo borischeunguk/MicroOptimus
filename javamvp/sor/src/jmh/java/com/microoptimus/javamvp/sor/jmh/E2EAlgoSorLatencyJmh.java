@@ -117,7 +117,9 @@ public class E2EAlgoSorLatencyJmh {
             coordToAlgoPub.offerBlocking(cmd.encode(), timeoutNs);
 
             int receivedForParent = 0;
+            long childStart = 0;
             while (receivedForParent < expectedChildrenPerParent) {
+                childStart = System.nanoTime();
                 CrossProcessAeronIpcTransport.PollResult out = sorToCoordSub.pollBlocking(timeoutNs);
                 SbeMessages.SorRouteRefEvent seqRoute = SbeMessages.SorRouteRefEvent.decode(out.payload);
                 if (seqRoute.parentOrderId != cmd.parentOrderId) {
@@ -128,7 +130,7 @@ public class E2EAlgoSorLatencyJmh {
                     throw new IllegalStateException("invalid route id");
                 }
                 RouteDecisionPayload decision = RouteDecisionPayload.decode(region.read(seqRoute.ref));
-                childRecorder.record(decision.processingLatencyNs);
+                childRecorder.record(System.nanoTime() - childStart);
                 receivedForParent++;
                 totalChildren++;
             }
