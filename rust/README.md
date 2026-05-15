@@ -38,8 +38,15 @@ MO_AERON_DIR=/tmp/microoptimus_aeron_test cargo test -p sor --features aeron-int
 cd /Users/xinyue/IdeaProjects/MicroOptimus/rust
 MO_BENCH_SAMPLES=100000 MO_BENCH_WARMUP_SECS=2 MO_BENCH_MEASUREMENT_SECS=5 MO_BENCH_CRITERION_SAMPLE_SIZE=10 MO_BENCH_HOP_TIMEOUT_SECS=600 cargo bench -p algo --bench vwap_latency --features aeron-integration -- --noplot algo_s1_steady
 MO_BENCH_SAMPLES=100000 MO_BENCH_WARMUP_SECS=2 MO_BENCH_MEASUREMENT_SECS=5 MO_BENCH_CRITERION_SAMPLE_SIZE=10 MO_BENCH_HOP_TIMEOUT_SECS=600 cargo bench -p sor --bench router_latency --features aeron-integration -- --noplot sor_s1_steady
-MO_BENCH_SAMPLES=100000 MO_BENCH_WARMUP_SECS=2 MO_BENCH_MEASUREMENT_SECS=5 MO_BENCH_CRITERION_SAMPLE_SIZE=10 MO_BENCH_HOP_TIMEOUT_SECS=600 cargo bench -p sor --bench e2e_algo_sor_latency --features aeron-integration -- --noplot e2e_s1_steady```
+MO_BENCH_SAMPLES=100000 MO_BENCH_WARMUP_SECS=2 MO_BENCH_MEASUREMENT_SECS=5 MO_BENCH_CRITERION_SAMPLE_SIZE=10 MO_BENCH_HOP_TIMEOUT_SECS=600 cargo bench -p sor --bench e2e_algo_sor_latency --features aeron-integration -- --noplot e2e_s1_steady
+```
+Find and kill any leftover service processes after the benchmarks:
 
+```bash
+ps aux | grep -E "cargo|target/release|rustc|e2e_algo_sor_latency|router_latency|vwap_latency" | grep -v grep
+ps aux | grep sor_aeron_service
+kill -9 <pid>
+```
 Reports (overwritten in-place):
 
 - `algo/perf-reports/rust_aeron_vwap_latency_algo_s1_steady.json`
