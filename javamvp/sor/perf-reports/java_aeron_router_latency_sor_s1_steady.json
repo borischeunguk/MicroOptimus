@@ -3,7 +3,7 @@
   "scenario": "sor_s1_steady",
   "samples": 1000000,
   "latency_ns_p90": 37,
-  "latency_ns_p99": 49,
-  "latency_ns_p999": 175,
-  "throughput_routes_per_sec": 94931.40105686443
+  "latency_ns_p99": 63,
+  "latency_ns_p999": 187,
+  "throughput_routes_per_sec": 98120.89247914369
 }

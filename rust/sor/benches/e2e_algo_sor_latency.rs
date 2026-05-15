@@ -17,9 +17,13 @@ use hdrhistogram::Histogram;
 use serde::Serialize;
 
 /// Each iteration sends one parent command through the full pipeline and collects one route.
-/// Orders use num_buckets=1 / participation_rate=1.0 so the engine produces exactly one
+/// Orders use NUM_BUCKETS=1 / participation_rate=1.0 so the engine produces exactly one
 /// slice per order and completes it immediately — no active-order accumulation across iters.
+/// To benchmark a multi-slice scenario, increase NUM_BUCKETS; the throughput and total_children
+/// metrics will automatically reflect the higher child-order rate.
 const MIN_REPORT_SAMPLES: u64 = 10_000;
+/// Number of slices the algo engine emits per parent order (must match num_buckets in the command).
+const NUM_BUCKETS: u64 = 300;
 const ORDER_END_TIME: u64 = 1_000_000;
 const PROCESS_TIME: u64 = ORDER_END_TIME - 1;
 
@@ -89,15 +93,20 @@ struct E2eBenchReport {
     bench: &'static str,
     scenario: &'static str,
     samples: u64,
+    /// Slices emitted per parent order (== num_buckets used when building the command).
+    children_per_parent: u64,
+    /// Total child slices routed: samples * children_per_parent.
+    total_children: u64,
     parent_latency_ns_p90: u64,
     parent_latency_ns_p99: u64,
     parent_latency_ns_p999: u64,
     child_latency_ns_p90: u64,
     child_latency_ns_p99: u64,
     child_latency_ns_p999: u64,
+    /// Parent orders completed per wall-clock second.
     throughput_parent_per_sec: f64,
+    /// Child slices routed per wall-clock second (throughput_parent_per_sec * children_per_parent).
     throughput_child_per_sec: f64,
-    total_children: u64,
 }
 
 fn scenarios() -> [Scenario; 4] {
@@ -136,13 +145,16 @@ fn write_report(
     parent_hist: &Histogram<u64>,
     child_hist: &Histogram<u64>,
     samples: u64,
-    total_children: u64,
+    children_per_parent: u64,
     elapsed: Duration,
 ) {
+    let total_children = samples * children_per_parent;
     let report = E2eBenchReport {
         bench: "e2e_algo_sor_latency",
         scenario: scenario.name,
         samples,
+        children_per_parent,
+        total_children,
         parent_latency_ns_p90: parent_hist.value_at_quantile(0.90),
         parent_latency_ns_p99: parent_hist.value_at_quantile(0.99),
         parent_latency_ns_p999: parent_hist.value_at_quantile(0.999),
@@ -151,7 +163,6 @@ fn write_report(
         child_latency_ns_p999: child_hist.value_at_quantile(0.999),
         throughput_parent_per_sec: samples as f64 / elapsed.as_secs_f64(),
         throughput_child_per_sec: total_children as f64 / elapsed.as_secs_f64(),
-        total_children,
     };
 
     let path = report_path(scenario.name);
@@ -356,7 +367,6 @@ fn bench_e2e_latency(c: &mut Criterion) {
                         Histogram::<u64>::new_with_bounds(1, 60_000_000_000, 3)
                             .expect("child histogram");
                     let wall_start = Instant::now();
-                    let mut total_children = 0u64;
 
                     for i in 0..samples {
                         let cmd = ParentOrderCommand {
@@ -365,12 +375,12 @@ fn bench_e2e_latency(c: &mut Criterion) {
                             client_id: 1,
                             symbol_index: 0,
                             side: 0,
-                            total_quantity: 1_000,
+                            total_quantity: 30_000,   // NUM_BUCKETS(300) * min_slice_size(10) * 10x headroom
                             limit_price: s.base_price,
                             start_time: 0,
                             end_time: ORDER_END_TIME,
                             timestamp: 0,
-                            num_buckets: 1,
+                            num_buckets: NUM_BUCKETS as u32,
                             participation_rate: 1.0,
                             min_slice_size: 10,
                             max_slice_size: 1_000,
@@ -388,42 +398,47 @@ fn bench_e2e_latency(c: &mut Criterion) {
                             std::hint::spin_loop();
                         }
 
-                        // Observe the emitted slice event to split parent and child latency paths.
-                        let _slice_bytes = loop {
-                            if let Some(b) = slice_sub.poll() {
-                                break b;
-                            }
-                            assert_running("algo", &mut algo);
-                            assert_running("sor", &mut sor);
-                            if parent_start.elapsed() > hop_timeout() {
-                                panic!("timed out waiting for algo slice event from Aeron");
-                            }
-                            std::hint::spin_loop();
-                        };
+                        // Collect all NUM_BUCKETS slice→route pairs for this parent.
+                        for _ in 0..NUM_BUCKETS {
+                            // Wait for the algo slice event.
+                            let _slice_bytes = loop {
+                                if let Some(b) = slice_sub.poll() {
+                                    break b;
+                                }
+                                assert_running("algo", &mut algo);
+                                assert_running("sor", &mut sor);
+                                if parent_start.elapsed() > hop_timeout() {
+                                    panic!("timed out waiting for algo slice event from Aeron");
+                                }
+                                std::hint::spin_loop();
+                            };
 
-                        let child_start = Instant::now();
+                            let child_start = Instant::now();
 
-                        let _route_bytes = loop {
-                            if let Some(b) = route_sub.poll() {
-                                break b;
-                            }
-                            assert_running("algo", &mut algo);
-                            assert_running("sor", &mut sor);
-                            if parent_start.elapsed() > hop_timeout() {
-                                panic!("timed out waiting for SOR route event from Aeron");
-                            }
-                            std::hint::spin_loop();
-                        };
+                            // Wait for the SOR route event for this child slice.
+                            let _route_bytes = loop {
+                                if let Some(b) = route_sub.poll() {
+                                    break b;
+                                }
+                                assert_running("algo", &mut algo);
+                                assert_running("sor", &mut sor);
+                                if parent_start.elapsed() > hop_timeout() {
+                                    panic!("timed out waiting for SOR route event from Aeron");
+                                }
+                                std::hint::spin_loop();
+                            };
 
+                            let child_elapsed = child_start.elapsed().as_nanos() as u64;
+                            let _ = child_hist.record(child_elapsed);
+                        }
+
+                        // Parent latency = total wall time until all NUM_BUCKETS children are routed.
                         let parent_elapsed = parent_start.elapsed().as_nanos() as u64;
-                        let child_elapsed = child_start.elapsed().as_nanos() as u64;
                         let _ = parent_hist.record(parent_elapsed);
-                        let _ = child_hist.record(child_elapsed);
-                        total_children += 1;
                     }
 
                     let wall = wall_start.elapsed();
-                    write_report(*s, &parent_hist, &child_hist, samples, total_children, wall);
+                    write_report(*s, &parent_hist, &child_hist, samples, NUM_BUCKETS, wall);
 
                     stop_child("algo", &mut algo);
                     stop_child("sor", &mut sor);

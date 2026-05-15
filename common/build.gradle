@@ -36,7 +36,7 @@ task generateSbe(type: JavaExec) {
     description = 'Generate SBE codecs from schema files'
 
     classpath configurations.sbe
-    main = 'uk.co.real_logic.sbe.SbeTool'
+    mainClass = 'uk.co.real_logic.sbe.SbeTool'
 
     def sbeSourceDir = file('src/main/sbe')
     def sbeTargetDir = file('src/main/java')

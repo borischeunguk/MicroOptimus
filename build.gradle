@@ -17,8 +17,6 @@ subprojects {
     apply plugin: 'java'
     apply plugin: 'idea'
 
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
 
     dependencies {
         // LMAX Disruptor
@@ -53,6 +51,7 @@ subprojects {
 
     tasks.withType(JavaCompile) {
         options.encoding = 'UTF-8'
+        options.release = 17
         options.compilerArgs += [
             '-Xlint:unchecked',
             '-Xlint:deprecation'
