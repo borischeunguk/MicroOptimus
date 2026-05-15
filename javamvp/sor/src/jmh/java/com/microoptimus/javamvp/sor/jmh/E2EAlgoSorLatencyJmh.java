@@ -21,9 +21,9 @@ import java.util.concurrent.ThreadLocalRandom;
 
 @State(Scope.Benchmark)
 public class E2EAlgoSorLatencyJmh {
-    private static final long DEFAULT_SAMPLES = 100L;
+    private static final long DEFAULT_SAMPLES = 100000L;
     private static final long SHUTDOWN_SEQUENCE_ID = -1L;
-    private static final long DEFAULT_TIMEOUT_NS = 5_000_000L;
+    private static final long DEFAULT_TIMEOUT_NS = 50_000_000L;
     private static final long DEFAULT_STARTUP_TIMEOUT_NS = 30_000_000_000L;
 
     private MmapSharedRegion region;

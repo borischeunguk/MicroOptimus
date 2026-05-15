@@ -17,7 +17,8 @@ cd /Users/xinyue/IdeaProjects/MicroOptimus
 
 ```bash
 cd /Users/xinyue/IdeaProjects/MicroOptimus
-./gradlew -p javamvp :sor:runE2ELatency -PjavamvpE2eSamples=100000
+./gradlew -p javamvp clean build
+./gradlew -p javamvp :sor:runE2ELatency -PjavamvpE2eSamples=100000 -Djavamvp.e2e.timeout.ns=50000000
 ```
 
 ## Expected reports
