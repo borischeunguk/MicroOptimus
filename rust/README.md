@@ -36,9 +36,18 @@ MO_AERON_DIR=/tmp/microoptimus_aeron_test cargo test -p sor --features aeron-int
 
 ```bash
 cd /Users/xinyue/IdeaProjects/MicroOptimus/rust
+
+# VWAP algo latency (100k single-slice parents)
 MO_BENCH_SAMPLES=100000 MO_BENCH_WARMUP_SECS=2 MO_BENCH_MEASUREMENT_SECS=5 MO_BENCH_CRITERION_SAMPLE_SIZE=10 MO_BENCH_HOP_TIMEOUT_SECS=600 cargo bench -p algo --bench vwap_latency --features aeron-integration -- --noplot algo_s1_steady
+
+# SOR routing latency (100k single-slice parents)
 MO_BENCH_SAMPLES=100000 MO_BENCH_WARMUP_SECS=2 MO_BENCH_MEASUREMENT_SECS=5 MO_BENCH_CRITERION_SAMPLE_SIZE=10 MO_BENCH_HOP_TIMEOUT_SECS=600 cargo bench -p sor --bench router_latency --features aeron-integration -- --noplot sor_s1_steady
-MO_BENCH_SAMPLES=100000 MO_BENCH_WARMUP_SECS=2 MO_BENCH_MEASUREMENT_SECS=5 MO_BENCH_CRITERION_SAMPLE_SIZE=10 MO_BENCH_HOP_TIMEOUT_SECS=600 cargo bench -p sor --bench e2e_algo_sor_latency --features aeron-integration -- --noplot e2e_s1_steady
+
+# E2E algo→SOR latency: 100k parent orders × 100 VWAP children = 10M child routes.
+# Params mirror Java MVP (qty=40_000, buckets=12, rate=0.12, tickStep=40_000, endNs=8_000_000).
+# Processes are spawned once per scenario (matches Java @Setup(Level.Trial)).
+# Estimated runtime: ~7 minutes (10 Criterion samples × ~44s/sample).
+MO_BENCH_SAMPLES=100000 MO_BENCH_CRITERION_SAMPLE_SIZE=10 MO_BENCH_MEASUREMENT_SECS=3500 MO_BENCH_HOP_TIMEOUT_SECS=600 cargo bench -p sor --bench e2e_algo_sor_latency --features aeron-integration -- e2e_s1_steady
 ```
 Find and kill any leftover service processes after the benchmarks:
 

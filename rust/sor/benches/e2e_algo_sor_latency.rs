@@ -16,12 +16,17 @@ use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Through
 use hdrhistogram::Histogram;
 use serde::Serialize;
 
-/// Each iteration sends one parent command through the full pipeline and collects one route.
-/// Orders use num_buckets=1 / participation_rate=1.0 so the engine produces exactly one
-/// slice per order and completes it immediately — no active-order accumulation across iters.
+/// Parameters mirror the Java MVP benchmark (E2EAlgoSorLatencyJmh):
+///   totalQuantity=40_000, participationRate=0.12, numBuckets=12,
+///   maxSliceSize=4_500, tickStepNs=40_000, endNs=8_000_000
+/// expectedChildren(40_000, 0.12, 12, 4_500, 0, 8_000_000, 40_000) = 100
 const MIN_REPORT_SAMPLES: u64 = 10_000;
-const ORDER_END_TIME: u64 = 1_000_000;
-const PROCESS_TIME: u64 = ORDER_END_TIME - 1;
+const ORDER_END_TIME: u64 = 8_000_000; // matches Java endNs
+const PROCESS_TIME: u64 = ORDER_END_TIME - 1; // 7_999_999 — all buckets visible
+/// Number of child slices the VWAP engine emits per parent (= Java expectedChildrenPerParent).
+const EXPECTED_CHILDREN_PER_PARENT: u64 = 100;
+/// Warmup parent orders sent before Criterion measurement begins (processes + Aeron warm-up).
+const WARMUP_PARENTS: u64 = 200;
 
 static AERON_STOP: OnceLock<Arc<AtomicBool>> = OnceLock::new();
 static STREAM_COUNTER: AtomicI32 = AtomicI32::new(500);
@@ -89,15 +94,20 @@ struct E2eBenchReport {
     bench: &'static str,
     scenario: &'static str,
     samples: u64,
+    /// VWAP slices emitted per parent order (mirrors Java expectedChildrenPerParent).
+    children_per_parent: u64,
+    /// total_children = samples * children_per_parent.
+    total_children: u64,
     parent_latency_ns_p90: u64,
     parent_latency_ns_p99: u64,
     parent_latency_ns_p999: u64,
+    /// child_latency = time from coordinator starting to wait → route event received
+    /// (includes Aeron queue wait + SOR hop; matches Java child measurement).
     child_latency_ns_p90: u64,
     child_latency_ns_p99: u64,
     child_latency_ns_p999: u64,
     throughput_parent_per_sec: f64,
     throughput_child_per_sec: f64,
-    total_children: u64,
 }
 
 fn scenarios() -> [Scenario; 4] {
@@ -136,13 +146,16 @@ fn write_report(
     parent_hist: &Histogram<u64>,
     child_hist: &Histogram<u64>,
     samples: u64,
-    total_children: u64,
+    children_per_parent: u64,
     elapsed: Duration,
 ) {
+    let total_children = samples * children_per_parent;
     let report = E2eBenchReport {
         bench: "e2e_algo_sor_latency",
         scenario: scenario.name,
         samples,
+        children_per_parent,
+        total_children,
         parent_latency_ns_p90: parent_hist.value_at_quantile(0.90),
         parent_latency_ns_p99: parent_hist.value_at_quantile(0.99),
         parent_latency_ns_p999: parent_hist.value_at_quantile(0.999),
@@ -151,7 +164,6 @@ fn write_report(
         child_latency_ns_p999: child_hist.value_at_quantile(0.999),
         throughput_parent_per_sec: samples as f64 / elapsed.as_secs_f64(),
         throughput_child_per_sec: total_children as f64 / elapsed.as_secs_f64(),
-        total_children,
     };
 
     let path = report_path(scenario.name);
@@ -271,169 +283,222 @@ fn spawn_sor_process(
         .expect("failed to spawn sor service process")
 }
 
+/// Publish one parent command and collect exactly `EXPECTED_CHILDREN_PER_PARENT` route events,
+/// optionally recording latencies into histograms (pass `None` for the warmup phase).
+///
+/// Child latency mirrors Java: timer starts **before** polling for the route event so the
+/// measurement includes Aeron queue wait + SOR processing, matching Java's `childStart =
+/// System.nanoTime()` → `pollBlocking()` pattern.
+#[allow(clippy::too_many_arguments)]
+fn run_one_parent(
+    seq: u64,
+    base_price: u64,
+    cmd_pub: &mut AeronClusterPublisher,
+    route_sub: &mut AeronClusterSubscriber,
+    algo: &mut std::process::Child,
+    sor: &mut std::process::Child,
+    parent_hist: Option<&mut Histogram<u64>>,
+    mut child_hist: Option<&mut Histogram<u64>>,
+) {
+    let cmd = ParentOrderCommand {
+        sequence_id: seq,
+        parent_order_id: seq,
+        client_id: 1,
+        symbol_index: 0,
+        side: 0,
+        // Matches Java: totalQuantity=40_000, numBuckets=12, rate=0.12, tickStep=40_000
+        // → expectedChildren(40_000,0.12,12,4_500,0,8_000_000,40_000) = 100
+        total_quantity: 40_000,
+        limit_price: base_price,
+        start_time: 0,
+        end_time: ORDER_END_TIME,
+        timestamp: 0,
+        num_buckets: 12,
+        participation_rate: 0.12,
+        min_slice_size: 100,
+        max_slice_size: 4_500,
+        slice_interval_ns: 0,
+        ..ParentOrderCommand::default()
+    };
+
+    let parent_start = Instant::now();
+    while !cmd_pub.publish(&cmd.encode()) {
+        assert_running("algo", algo);
+        assert_running("sor", sor);
+        if parent_start.elapsed() > hop_timeout() {
+            panic!("timed out publishing parent command to Aeron");
+        }
+        std::hint::spin_loop();
+    }
+
+    // Collect all EXPECTED_CHILDREN_PER_PARENT route events for this parent.
+    // child_latency timer starts before polling (matches Java coordinator timing).
+    for _ in 0..EXPECTED_CHILDREN_PER_PARENT {
+        let child_start = Instant::now();
+        loop {
+            if route_sub.poll().is_some() {
+                break;
+            }
+            assert_running("algo", algo);
+            assert_running("sor", sor);
+            if parent_start.elapsed() > hop_timeout() {
+                panic!("timed out waiting for SOR route event from Aeron");
+            }
+            std::hint::spin_loop();
+        }
+        if let Some(h) = child_hist.as_deref_mut() {
+            let _ = h.record(child_start.elapsed().as_nanos() as u64);
+        }
+    }
+
+    if let Some(h) = parent_hist {
+        let _ = h.record(parent_start.elapsed().as_nanos() as u64);
+    }
+}
+
 fn bench_e2e_latency(c: &mut Criterion) {
     ensure_driver();
     let ws_root = workspace_root();
     ensure_service_binaries(&ws_root);
 
     let mut group = c.benchmark_group("e2e_algo_sor_latency");
-    group.measurement_time(configured_secs("MO_BENCH_MEASUREMENT_SECS", 5));
-    group.warm_up_time(configured_secs("MO_BENCH_WARMUP_SECS", 2));
+    group.measurement_time(configured_secs("MO_BENCH_MEASUREMENT_SECS", 60));
+    // We run WARMUP_PARENTS orders before bench_with_input, so Criterion warmup is redundant.
+    // Clamp to 1 s minimum because Criterion asserts warm_up_time > 0.
+    let wu_secs = std::env::var("MO_BENCH_WARMUP_SECS")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(1)
+        .max(1);
+    group.warm_up_time(Duration::from_secs(wu_secs));
     group.sample_size(configured_sample_size());
 
-    for scenario in scenarios() {
+    for s in scenarios() {
         group.throughput(Throughput::Elements(1));
+
+        // ── Process lifecycle: spawned ONCE per scenario (mirrors Java @Setup(Level.Trial)) ──
+        let base = next_stream_base(3);
+        let parent_cmd_stream = STREAM_PARENT_CMD + base;
+        let algo_slice_stream = STREAM_ALGO_SLICE + base;
+        let sor_route_stream = STREAM_SOR_ROUTE + base;
+
+        let shm_region_id = 1u32;
+        let shm_path = std::env::temp_dir().join(format!(
+            "microoptimus_rust_aeron_shm_{}_{}_{}.dat",
+            std::process::id(),
+            base,
+            s.name,
+        ));
+        let shm_path_string = shm_path
+            .to_str()
+            .expect("tmp shm path must be valid UTF-8")
+            .to_owned();
+
+        let _shm_region = SharedRegion::create(&shm_path_string, shm_region_id, s.shm_capacity);
+
+        let mut algo = spawn_algo_process(
+            &ws_root,
+            parent_cmd_stream,
+            algo_slice_stream,
+            &shm_path_string,
+            shm_region_id,
+            s.shm_capacity,
+            s.base_price,
+        );
+        let mut sor = spawn_sor_process(
+            &ws_root,
+            algo_slice_stream,
+            sor_route_stream,
+            &shm_path_string,
+            shm_region_id,
+            s.shm_capacity,
+        );
+
+        // Allow process startup and Aeron image establishment.
+        thread::sleep(Duration::from_millis(200));
+        if let Ok(Some(status)) = algo.try_wait() {
+            panic!("algo service exited early with status {status}");
+        }
+        if let Ok(Some(status)) = sor.try_wait() {
+            panic!("sor service exited early with status {status}");
+        }
+        thread::sleep(Duration::from_millis(200));
+
+        // Coordinator only needs cmd_pub (→ algo) and route_sub (← SOR).
+        // The algo→sor slice stream is internal; benchmark does not subscribe to it,
+        // matching the Java coordinator which only uses coordToAlgoPub + sorToCoordSub.
+        let mut cmd_pub =
+            AeronClusterPublisher::new("aeron:ipc", parent_cmd_stream).expect("cmd publisher");
+        let mut route_sub =
+            AeronClusterSubscriber::new("aeron:ipc", sor_route_stream).expect("route subscriber");
+
+        // ── Warmup: exercise full pipeline before measurement (matches Java implicit JIT warmup) ──
+        let mut warmup_seq = 0u64;
+        for _ in 0..WARMUP_PARENTS {
+            warmup_seq += 1;
+            run_one_parent(
+                warmup_seq,
+                s.base_price,
+                &mut cmd_pub,
+                &mut route_sub,
+                &mut algo,
+                &mut sor,
+                None,
+                None,
+            );
+        }
+
+        // Histograms live outside iter_custom and are reset at the start of each Criterion
+        // iteration so that warmup runs and multiple measurement iterations don't pollute each
+        // other.  The final write_report overwrites perf-reports/ with the last clean sample.
+        let mut parent_hist =
+            Histogram::<u64>::new_with_bounds(1, 60_000_000_000, 3).expect("parent histogram");
+        let mut child_hist =
+            Histogram::<u64>::new_with_bounds(1, 60_000_000_000, 3).expect("child histogram");
+
+        // seq counter shared across all iter_custom calls — just needs to be monotone.
+        let mut seq = warmup_seq;
+
         group.bench_with_input(
-            BenchmarkId::new("parent_to_routed_children", scenario.name),
-            &scenario,
-            |b, s| {
+            BenchmarkId::new("parent_to_routed_children", s.name),
+            &s,
+            |b, sc| {
                 b.iter_custom(|iters| {
                     let samples = configured_samples(iters);
+                    parent_hist.reset();
+                    child_hist.reset();
 
-                    let base = next_stream_base(3);
-                    let parent_cmd_stream = STREAM_PARENT_CMD + base;
-                    let algo_slice_stream = STREAM_ALGO_SLICE + base;
-                    let sor_route_stream = STREAM_SOR_ROUTE + base;
-
-                    let shm_region_id = 1u32;
-                    let shm_path = std::env::temp_dir().join(format!(
-                        "microoptimus_rust_aeron_shm_{}_{}_{}.dat",
-                        std::process::id(),
-                        base,
-                        s.name
-                    ));
-                    let shm_path_string = shm_path
-                        .to_str()
-                        .expect("tmp shm path must be valid UTF-8")
-                        .to_owned();
-
-                    let region = SharedRegion::create(&shm_path_string, shm_region_id, s.shm_capacity);
-
-                    let mut algo = spawn_algo_process(
-                        &ws_root,
-                        parent_cmd_stream,
-                        algo_slice_stream,
-                        &shm_path_string,
-                        shm_region_id,
-                        s.shm_capacity,
-                        s.base_price,
-                    );
-                    let mut sor = spawn_sor_process(
-                        &ws_root,
-                        algo_slice_stream,
-                        sor_route_stream,
-                        &shm_path_string,
-                        shm_region_id,
-                        s.shm_capacity,
-                    );
-
-                    // Give child processes a brief startup window and fail fast if they crashed.
-                    thread::sleep(Duration::from_millis(200));
-                    if let Ok(Some(status)) = algo.try_wait() {
-                        panic!("algo service exited early with status {status}");
-                    }
-                    if let Ok(Some(status)) = sor.try_wait() {
-                        panic!("sor service exited early with status {status}");
-                    }
-
-                    // Allow Aeron publications/subscriptions across processes to establish images.
-                    thread::sleep(Duration::from_millis(200));
-
-                    let mut cmd_pub =
-                        AeronClusterPublisher::new("aeron:ipc", parent_cmd_stream)
-                            .expect("cmd publisher");
-                    let mut slice_sub =
-                        AeronClusterSubscriber::new("aeron:ipc", algo_slice_stream)
-                            .expect("slice subscriber");
-                    let mut route_sub =
-                        AeronClusterSubscriber::new("aeron:ipc", sor_route_stream)
-                            .expect("route subscriber");
-
-                    let mut parent_hist =
-                        Histogram::<u64>::new_with_bounds(1, 60_000_000_000, 3)
-                            .expect("parent histogram");
-                    let mut child_hist =
-                        Histogram::<u64>::new_with_bounds(1, 60_000_000_000, 3)
-                            .expect("child histogram");
                     let wall_start = Instant::now();
-                    let mut total_children = 0u64;
-
-                    for i in 0..samples {
-                        let cmd = ParentOrderCommand {
-                            sequence_id: i + 1,
-                            parent_order_id: i + 1,
-                            client_id: 1,
-                            symbol_index: 0,
-                            side: 0,
-                            total_quantity: 1_000,
-                            limit_price: s.base_price,
-                            start_time: 0,
-                            end_time: ORDER_END_TIME,
-                            timestamp: 0,
-                            num_buckets: 1,
-                            participation_rate: 1.0,
-                            min_slice_size: 10,
-                            max_slice_size: 1_000,
-                            slice_interval_ns: 0,
-                            ..ParentOrderCommand::default()
-                        };
-
-                        let parent_start = Instant::now();
-                        while !cmd_pub.publish(&cmd.encode()) {
-                            assert_running("algo", &mut algo);
-                            assert_running("sor", &mut sor);
-                            if parent_start.elapsed() > hop_timeout() {
-                                panic!("timed out publishing parent command to Aeron");
-                            }
-                            std::hint::spin_loop();
-                        }
-
-                        // Observe the emitted slice event to split parent and child latency paths.
-                        let _slice_bytes = loop {
-                            if let Some(b) = slice_sub.poll() {
-                                break b;
-                            }
-                            assert_running("algo", &mut algo);
-                            assert_running("sor", &mut sor);
-                            if parent_start.elapsed() > hop_timeout() {
-                                panic!("timed out waiting for algo slice event from Aeron");
-                            }
-                            std::hint::spin_loop();
-                        };
-
-                        let child_start = Instant::now();
-
-                        let _route_bytes = loop {
-                            if let Some(b) = route_sub.poll() {
-                                break b;
-                            }
-                            assert_running("algo", &mut algo);
-                            assert_running("sor", &mut sor);
-                            if parent_start.elapsed() > hop_timeout() {
-                                panic!("timed out waiting for SOR route event from Aeron");
-                            }
-                            std::hint::spin_loop();
-                        };
-
-                        let parent_elapsed = parent_start.elapsed().as_nanos() as u64;
-                        let child_elapsed = child_start.elapsed().as_nanos() as u64;
-                        let _ = parent_hist.record(parent_elapsed);
-                        let _ = child_hist.record(child_elapsed);
-                        total_children += 1;
+                    for _ in 0..samples {
+                        seq += 1;
+                        run_one_parent(
+                            seq,
+                            sc.base_price,
+                            &mut cmd_pub,
+                            &mut route_sub,
+                            &mut algo,
+                            &mut sor,
+                            Some(&mut parent_hist),
+                            Some(&mut child_hist),
+                        );
                     }
-
                     let wall = wall_start.elapsed();
-                    write_report(*s, &parent_hist, &child_hist, samples, total_children, wall);
-
-                    stop_child("algo", &mut algo);
-                    stop_child("sor", &mut sor);
-
-                    let _ = fs::remove_file(&shm_path);
-                    std::mem::drop(region);
-                    wall
+                    write_report(*sc, &parent_hist, &child_hist, samples, EXPECTED_CHILDREN_PER_PARENT, wall);
+                    // Scale wall time to match Criterion's expected iters count so that
+                    // Criterion displays the correct per-parent latency and doesn't crash
+                    // when plotting near-zero values.  Our real measurements are in
+                    // write_report; Criterion's display is ancillary.
+                    let nanos = wall.as_secs_f64() * 1e9 * iters as f64 / samples.max(1) as f64;
+                    Duration::from_nanos(nanos.min(u64::MAX as f64) as u64).max(Duration::from_nanos(1))
                 });
             },
         );
+
+        // ── Teardown: kill processes after all Criterion iterations complete ──
+        stop_child("algo", &mut algo);
+        stop_child("sor", &mut sor);
+        let _ = fs::remove_file(&shm_path);
+        std::mem::drop(_shm_region);
     }
 
     group.finish();
