@@ -1,7 +1,7 @@
 use crate::types::*;
 
 /// Maximum number of VWAP volume profile buckets.
-pub const MAX_BUCKETS: usize = 300;
+pub const MAX_BUCKETS: usize = 32;
 /// Maximum number of venue allocations in a routing decision.
 pub const MAX_ALLOCATIONS: usize = 4;
 

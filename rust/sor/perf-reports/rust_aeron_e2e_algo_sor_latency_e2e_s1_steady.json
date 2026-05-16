@@ -1,15 +1,14 @@
 {
   "bench": "e2e_algo_sor_latency",
   "scenario": "e2e_s1_steady",
-  "samples": 20,
-  "children_per_parent": 300,
-  "total_children": 6000,
-  "parent_latency_ns_p90": 283903,
-  "parent_latency_ns_p99": 365823,
-  "parent_latency_ns_p999": 365823,
-  "child_latency_ns_p90": 283,
-  "child_latency_ns_p99": 2951,
-  "child_latency_ns_p999": 36511,
-  "throughput_parent_per_sec": 4868.833622217461,
-  "throughput_child_per_sec": 1460650.0866652385
+  "samples": 100000,
+  "parent_latency_ns_p90": 2607,
+  "parent_latency_ns_p99": 12951,
+  "parent_latency_ns_p999": 60415,
+  "child_latency_ns_p90": 756,
+  "child_latency_ns_p99": 3183,
+  "child_latency_ns_p999": 45951,
+  "throughput_parent_per_sec": 676177.2209918164,
+  "throughput_child_per_sec": 676177.2209918164,
+  "total_children": 100000
 }

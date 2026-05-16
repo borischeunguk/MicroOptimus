@@ -64,12 +64,7 @@ impl VwapAlgorithm {
     /// Creates volume profile and distributes target quantities across buckets.
     pub fn initialize(&mut self, order: &AlgoOrder) {
         let params = &order.params;
-        self.num_buckets = (params.num_buckets as usize).min(MAX_BUCKETS);
-        debug_assert_eq!(
-            params.num_buckets as usize, self.num_buckets,
-            "num_buckets {} exceeds MAX_BUCKETS {}",
-            params.num_buckets, MAX_BUCKETS
-        );
+        self.num_buckets = params.num_buckets as usize;
 
         // Create U-shaped volume profile
         self.create_default_volume_profile();
