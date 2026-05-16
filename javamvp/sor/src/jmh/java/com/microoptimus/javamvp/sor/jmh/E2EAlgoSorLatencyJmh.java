@@ -8,7 +8,9 @@ import com.microoptimus.javamvp.common.MmapSharedRegion;
 import com.microoptimus.javamvp.common.SbeMessages;
 import com.microoptimus.javamvp.sor.RouteDecisionPayload;
 import org.openjdk.jmh.annotations.Benchmark;
+import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Level;
+import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
@@ -19,6 +21,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.ThreadLocalRandom;
 
+@BenchmarkMode(Mode.SingleShotTime)
 @State(Scope.Benchmark)
 public class E2EAlgoSorLatencyJmh {
     private static final long DEFAULT_SAMPLES = 100000L;

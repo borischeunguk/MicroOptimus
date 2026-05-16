@@ -23,8 +23,7 @@ jmh {
     warmupIterations = 0
     iterations = 1
     fork = 1
-    timeOnIteration = benchmarkIterationTime
-    benchmarkMode = ['avgt']
+    benchmarkMode = ['ss']
     timeUnit = 'ns'
     failOnError = true
     jvmArgsAppend = [
@@ -57,4 +56,3 @@ tasks.register('runSorE2eService', JavaExec) {
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'com.microoptimus.javamvp.sor.SorE2eServiceMain'
 }
-
