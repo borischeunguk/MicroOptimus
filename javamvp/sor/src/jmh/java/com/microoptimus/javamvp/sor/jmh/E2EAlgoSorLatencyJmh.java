@@ -120,6 +120,8 @@ public class E2EAlgoSorLatencyJmh {
             cmd.sequenceId = i + 1;
             cmd.parentOrderId = i + 1;
             cmd.timestamp = i;
+            cmd.side = (byte) ThreadLocalRandom.current().nextInt(0, 2);
+            cmd.limitPrice = ThreadLocalRandom.current().nextInt(1450, 1551);
 
             coordToAlgoPub.offerBlocking(cmd.encode(), timeoutNs);
 
@@ -307,4 +309,3 @@ public class E2EAlgoSorLatencyJmh {
         }
     }
 }
-
