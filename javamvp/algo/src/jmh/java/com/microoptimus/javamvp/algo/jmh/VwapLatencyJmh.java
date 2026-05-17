@@ -29,9 +29,11 @@ public class VwapLatencyJmh {
     private long wallStart;
     private SbeMessages.ParentOrderCommand cmd;
     private VwapMvpEngine.ParentOrder order;
+    private VwapMvpEngine.EmissionMode emissionMode;
 
     @Setup(Level.Trial)
     public void setup() {
+        emissionMode = VwapMvpEngine.EmissionMode.fromSystemPropertyOrThrow();
         engine = new VwapMvpEngine();
         sequencer = RealAeronIpcSequencer.launch("algo-jmh");
         samples = Long.getLong("javamvp.samples", DEFAULT_SAMPLES);
@@ -77,7 +79,22 @@ public class VwapLatencyJmh {
             order.leavesQuantity = decoded.totalQuantity;
 
             long started = System.nanoTime();
-            List<SlicePayload> slices = engine.generateSlices(order);
+            List<SlicePayload> slices;
+            if (emissionMode == VwapMvpEngine.EmissionMode.BATCH_BENCH) {
+                slices = engine.generateSlices(order);
+            } else {
+                java.util.ArrayList<SlicePayload> out = new java.util.ArrayList<>();
+                engine.resetRustParityState(order);
+                final long processTimeNs = Math.max(order.startNs, order.endNs - 1);
+                while (order.leavesQuantity > 0) {
+                    SlicePayload slice = engine.generateSliceRustParity(order, processTimeNs);
+                    if (slice == null) {
+                        break;
+                    }
+                    out.add(slice);
+                }
+                slices = out;
+            }
             long elapsed = System.nanoTime() - started;
             recorder.record(elapsed);
             totalChildren += slices.size();

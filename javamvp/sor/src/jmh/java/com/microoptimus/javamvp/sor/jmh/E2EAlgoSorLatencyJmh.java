@@ -6,6 +6,7 @@ import com.microoptimus.javamvp.common.E2EIpcConfig;
 import com.microoptimus.javamvp.common.EmbeddedAeronMediaDriver;
 import com.microoptimus.javamvp.common.MmapSharedRegion;
 import com.microoptimus.javamvp.common.SbeMessages;
+import com.microoptimus.javamvp.algo.VwapMvpEngine;
 import com.microoptimus.javamvp.sor.RouteDecisionPayload;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -48,11 +49,14 @@ public class E2EAlgoSorLatencyJmh {
     private String mmapPath;
     private Process algoProcess;
     private Process sorProcess;
+    private VwapMvpEngine.EmissionMode emissionMode;
     private SbeMessages.ParentOrderCommand cmd;
     private SbeMessages.ControlMessage controlMsg;
 
     @Setup(Level.Trial)
     public void setup() throws Exception {
+        emissionMode = VwapMvpEngine.EmissionMode.fromSystemPropertyOrThrow();
+
         samples = Long.getLong("javamvp.e2e.samples", DEFAULT_SAMPLES);
         timeoutNs = Long.getLong("javamvp.e2e.timeout.ns", DEFAULT_TIMEOUT_NS);
         startupTimeoutNs = Long.getLong("javamvp.e2e.startup.timeout.ns", DEFAULT_STARTUP_TIMEOUT_NS);
@@ -157,6 +161,7 @@ public class E2EAlgoSorLatencyJmh {
             "-Djavamvp.e2e.mmap.path=" + mmapPath,
             "-Djavamvp.e2e.timeout.ns=" + timeoutNs,
             "-Djavamvp.e2e.startup.timeout.ns=" + startupTimeoutNs,
+            "-D" + VwapMvpEngine.EMISSION_MODE_PROPERTY + "=" + emissionMode.name(),
             "-cp",
             classpath,
             mainClass);

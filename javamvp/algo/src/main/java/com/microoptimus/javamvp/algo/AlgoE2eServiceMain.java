@@ -22,6 +22,7 @@ public final class AlgoE2eServiceMain {
         if (aeronDir == null || aeronDir.isBlank()) {
             throw new IllegalArgumentException("Missing -Djavamvp.e2e.aeron.dir");
         }
+        VwapMvpEngine.EmissionMode emissionMode = VwapMvpEngine.EmissionMode.fromSystemPropertyOrThrow();
 
         VwapMvpEngine engine = new VwapMvpEngine();
         VwapMvpEngine.ParentOrder order = new VwapMvpEngine.ParentOrder();
@@ -64,15 +65,34 @@ public final class AlgoE2eServiceMain {
                 order.side = cmd.side == 0 ? Types.Side.BUY : Types.Side.SELL;
                 order.leavesQuantity = cmd.totalQuantity;
 
-                List<SlicePayload> slices = engine.generateSlices(order);
-                for (SlicePayload slice : slices) {
-                    ShmRef ref = region.write(SbeMessages.TEMPLATE_ALGO_SLICE_REF, slice.encode());
-                    out.sequenceId = cmd.sequenceId;
-                    out.parentOrderId = slice.parentOrderId;
-                    out.sliceId = slice.sliceId;
-                    out.timestamp = slice.timestamp;
-                    out.ref = ref;
-                    outPub.offerBlocking(out.encode(), timeoutNs);
+                if (emissionMode == VwapMvpEngine.EmissionMode.BATCH_BENCH) {
+                    List<SlicePayload> slices = engine.generateSlices(order);
+                    for (SlicePayload slice : slices) {
+                        ShmRef ref = region.write(SbeMessages.TEMPLATE_ALGO_SLICE_REF, slice.encode());
+                        out.sequenceId = cmd.sequenceId;
+                        out.parentOrderId = slice.parentOrderId;
+                        out.sliceId = slice.sliceId;
+                        out.timestamp = slice.timestamp;
+                        out.ref = ref;
+                        outPub.offerBlocking(out.encode(), timeoutNs);
+                    }
+                } else {
+                    engine.resetRustParityState(order);
+                    final long processTimeNs = Math.max(order.startNs, order.endNs - 1);
+                    while (order.leavesQuantity > 0) {
+                        SlicePayload slice = engine.generateSliceRustParity(order, processTimeNs);
+                        if (slice == null) {
+                            break;
+                        }
+
+                        ShmRef ref = region.write(SbeMessages.TEMPLATE_ALGO_SLICE_REF, slice.encode());
+                        out.sequenceId = cmd.sequenceId;
+                        out.parentOrderId = slice.parentOrderId;
+                        out.sliceId = slice.sliceId;
+                        out.timestamp = slice.timestamp;
+                        out.ref = ref;
+                        outPub.offerBlocking(out.encode(), timeoutNs);
+                    }
                 }
             }
         } catch (CrossProcessAeronIpcTransport.TimeoutException e) {

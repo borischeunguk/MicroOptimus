@@ -11,6 +11,8 @@ public final class VwapLatencyBenchmark {
     private static final long SAMPLES = 1_000_000L;
 
     public static void main(String[] args) throws IOException {
+        VwapMvpEngine.EmissionMode emissionMode = VwapMvpEngine.EmissionMode.fromSystemPropertyOrThrow();
+
         VwapMvpEngine engine = new VwapMvpEngine();
         BenchmarkSupport.LatencyRecorder recorder = new BenchmarkSupport.LatencyRecorder((int) SAMPLES);
 
@@ -32,7 +34,22 @@ public final class VwapLatencyBenchmark {
             order.maxSliceSize = 4_000;
 
             long started = System.nanoTime();
-            List<SlicePayload> slices = engine.generateSlices(order);
+            List<SlicePayload> slices;
+            if (emissionMode == VwapMvpEngine.EmissionMode.BATCH_BENCH) {
+                slices = engine.generateSlices(order);
+            } else {
+                java.util.ArrayList<SlicePayload> out = new java.util.ArrayList<>();
+                engine.resetRustParityState(order);
+                final long processTimeNs = Math.max(order.startNs, order.endNs - 1);
+                while (order.leavesQuantity > 0) {
+                    SlicePayload slice = engine.generateSliceRustParity(order, processTimeNs);
+                    if (slice == null) {
+                        break;
+                    }
+                    out.add(slice);
+                }
+                slices = out;
+            }
             long elapsed = System.nanoTime() - started;
             recorder.record(elapsed);
             totalChildren += slices.size();

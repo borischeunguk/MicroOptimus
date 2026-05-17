@@ -17,6 +17,8 @@ public final class E2EAlgoSorLatencyBenchmark {
     private static final long SAMPLES = 1_000_000L;
 
     public static void main(String[] args) throws IOException {
+        VwapMvpEngine.EmissionMode emissionMode = VwapMvpEngine.EmissionMode.fromSystemPropertyOrThrow();
+
         AeronStyleSequencer seqAlgoToSor = new AeronStyleSequencer();
         AeronStyleSequencer seqSorOut = new AeronStyleSequencer();
         MmapSharedRegion region = new MmapSharedRegion(Paths.get(".ipc", "javamvp_mmap_region.dat"), 1, 8 * 1024 * 1024);
@@ -46,17 +48,37 @@ public final class E2EAlgoSorLatencyBenchmark {
             order.participationRate = 0.12;
             order.maxSliceSize = 4_500;
 
-            List<SlicePayload> slices = algo.generateSlices(order);
-            for (SlicePayload slice : slices) {
-                ShmRef sliceRef = region.write(SbeMessages.TEMPLATE_ALGO_SLICE_REF, slice.encode());
-                SbeMessages.AlgoSliceRefEvent in = new SbeMessages.AlgoSliceRefEvent();
-                in.sequenceId = i + 1;
-                in.parentOrderId = slice.parentOrderId;
-                in.sliceId = slice.sliceId;
-                in.timestamp = slice.timestamp;
-                in.ref = sliceRef;
-                seqAlgoToSor.publish(in.encode());
-                totalChildren++;
+            if (emissionMode == VwapMvpEngine.EmissionMode.BATCH_BENCH) {
+                List<SlicePayload> slices = algo.generateSlices(order);
+                for (SlicePayload slice : slices) {
+                    ShmRef sliceRef = region.write(SbeMessages.TEMPLATE_ALGO_SLICE_REF, slice.encode());
+                    SbeMessages.AlgoSliceRefEvent in = new SbeMessages.AlgoSliceRefEvent();
+                    in.sequenceId = i + 1;
+                    in.parentOrderId = slice.parentOrderId;
+                    in.sliceId = slice.sliceId;
+                    in.timestamp = slice.timestamp;
+                    in.ref = sliceRef;
+                    seqAlgoToSor.publish(in.encode());
+                    totalChildren++;
+                }
+            } else {
+                algo.resetRustParityState(order);
+                final long processTimeNs = Math.max(order.startNs, order.endNs - 1);
+                while (order.leavesQuantity > 0) {
+                    SlicePayload slice = algo.generateSliceRustParity(order, processTimeNs);
+                    if (slice == null) {
+                        break;
+                    }
+                    ShmRef sliceRef = region.write(SbeMessages.TEMPLATE_ALGO_SLICE_REF, slice.encode());
+                    SbeMessages.AlgoSliceRefEvent in = new SbeMessages.AlgoSliceRefEvent();
+                    in.sequenceId = i + 1;
+                    in.parentOrderId = slice.parentOrderId;
+                    in.sliceId = slice.sliceId;
+                    in.timestamp = slice.timestamp;
+                    in.ref = sliceRef;
+                    seqAlgoToSor.publish(in.encode());
+                    totalChildren++;
+                }
             }
 
             byte[] eventBytes;
