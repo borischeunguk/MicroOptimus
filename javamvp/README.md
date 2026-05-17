@@ -20,6 +20,13 @@ cd /Users/xinyue/IdeaProjects/MicroOptimus
 ./gradlew -p javamvp clean build
 ./gradlew -p javamvp :sor:runE2ELatency -PjavamvpE2eSamples=100000 -Djavamvp.e2e.timeout.ns=50000000
 ```
+Run RUST_PARITY or BATCH_BENCH modes:
+
+```bash
+cd /Users/xinyue/IdeaProjects/MicroOptimus
+JAVA_TOOL_OPTIONS='-Djavamvp.algo.emission.mode=RUST_PARITY' ./gradlew -p javamvp :sor:runE2ELatency -PjavamvpE2eSamples=100000 -Djavamvp.e2e.timeout.ns=50000000 --rerun-tasks
+JAVA_TOOL_OPTIONS='-Djavamvp.algo.emission.mode=BATCH_BENCH' ./gradlew -p javamvp :sor:runE2ELatency -PjavamvpE2eSamples=100000 -Djavamvp.e2e.timeout.ns=50000000 --rerun-tasks
+```
 
 ## Expected reports
 

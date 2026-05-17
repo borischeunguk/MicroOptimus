@@ -7,10 +7,13 @@ import com.microoptimus.javamvp.common.SbeMessages;
 import com.microoptimus.javamvp.common.ShmRef;
 import com.microoptimus.javamvp.common.Types;
 
+import java.util.ArrayDeque;
 import java.nio.file.Paths;
 import java.util.List;
 
 public final class AlgoE2eServiceMain {
+    private static final long DEFAULT_TICK_STEP_NS = 40_000L;
+
     private AlgoE2eServiceMain() {
     }
 
@@ -25,16 +28,6 @@ public final class AlgoE2eServiceMain {
         VwapMvpEngine.EmissionMode emissionMode = VwapMvpEngine.EmissionMode.fromSystemPropertyOrThrow();
 
         VwapMvpEngine engine = new VwapMvpEngine();
-        VwapMvpEngine.ParentOrder order = new VwapMvpEngine.ParentOrder();
-        order.symbolIndex = 1;
-        order.totalQuantity = 40_000;
-        order.basePrice = 1500;
-        order.startNs = 0;
-        order.endNs = 8_000_000;
-        order.tickStepNs = 40_000;
-        order.numBuckets = 12;
-        order.participationRate = 0.12;
-        order.maxSliceSize = 4_500;
 
         SbeMessages.AlgoSliceRefEvent out = new SbeMessages.AlgoSliceRefEvent();
         SbeMessages.ControlMessage ctrl = new SbeMessages.ControlMessage();
@@ -54,49 +47,97 @@ public final class AlgoE2eServiceMain {
             awaitStart(controlIn, startupTimeoutNs, E2EIpcConfig.SERVICE_ALGO);
 
 
-            while (true) {
-                CrossProcessAeronIpcTransport.PollResult in = inSub.pollBlocking(startupTimeoutNs);
-                SbeMessages.ParentOrderCommand cmd = SbeMessages.ParentOrderCommand.decode(in.payload);
-                if (cmd.sequenceId < 0) {
-                    break;
+            ArrayDeque<PendingParent> activeParents = new ArrayDeque<>();
+            boolean stopRequested = false;
+            while (!stopRequested) {
+                byte[] payload;
+                while ((payload = inSub.poll()) != null) {
+                    SbeMessages.ParentOrderCommand cmd = SbeMessages.ParentOrderCommand.decode(payload);
+                    if (cmd.sequenceId < 0) {
+                        stopRequested = true;
+                        break;
+                    }
+
+                    VwapMvpEngine.ParentOrder nextOrder = toParentOrder(cmd);
+                    if (emissionMode == VwapMvpEngine.EmissionMode.BATCH_BENCH) {
+                        List<SlicePayload> slices = engine.generateSlices(nextOrder);
+                        for (SlicePayload slice : slices) {
+                            ShmRef ref = region.write(SbeMessages.TEMPLATE_ALGO_SLICE_REF, slice.encode());
+                            out.sequenceId = cmd.sequenceId;
+                            out.parentOrderId = slice.parentOrderId;
+                            out.sliceId = slice.sliceId;
+                            out.timestamp = slice.timestamp;
+                            out.ref = ref;
+                            outPub.offerBlocking(out.encode(), timeoutNs);
+                        }
+                    } else {
+                        engine.resetRustParityState(nextOrder);
+                        activeParents.addLast(new PendingParent(cmd.sequenceId, nextOrder));
+                    }
                 }
 
-                order.parentOrderId = cmd.parentOrderId;
-                order.side = cmd.side == 0 ? Types.Side.BUY : Types.Side.SELL;
-                order.leavesQuantity = cmd.totalQuantity;
-
-                if (emissionMode == VwapMvpEngine.EmissionMode.BATCH_BENCH) {
-                    List<SlicePayload> slices = engine.generateSlices(order);
-                    for (SlicePayload slice : slices) {
-                        ShmRef ref = region.write(SbeMessages.TEMPLATE_ALGO_SLICE_REF, slice.encode());
-                        out.sequenceId = cmd.sequenceId;
-                        out.parentOrderId = slice.parentOrderId;
-                        out.sliceId = slice.sliceId;
-                        out.timestamp = slice.timestamp;
-                        out.ref = ref;
-                        outPub.offerBlocking(out.encode(), timeoutNs);
-                    }
-                } else {
-                    engine.resetRustParityState(order);
-                    final long processTimeNs = Math.max(order.startNs, order.endNs - 1);
-                    while (order.leavesQuantity > 0) {
-                        SlicePayload slice = engine.generateSliceRustParity(order, processTimeNs);
-                        if (slice == null) {
+                if (emissionMode == VwapMvpEngine.EmissionMode.RUST_PARITY && !activeParents.isEmpty()) {
+                    int activeCount = activeParents.size();
+                    for (int i = 0; i < activeCount; i++) {
+                        PendingParent pending = activeParents.pollFirst();
+                        if (pending == null) {
                             break;
                         }
 
-                        ShmRef ref = region.write(SbeMessages.TEMPLATE_ALGO_SLICE_REF, slice.encode());
-                        out.sequenceId = cmd.sequenceId;
-                        out.parentOrderId = slice.parentOrderId;
-                        out.sliceId = slice.sliceId;
-                        out.timestamp = slice.timestamp;
-                        out.ref = ref;
-                        outPub.offerBlocking(out.encode(), timeoutNs);
+                        VwapMvpEngine.ParentOrder parent = pending.order;
+                        long processTimeNs = Math.max(parent.startNs, parent.endNs - 1);
+                        SlicePayload slice = engine.generateSliceRustParity(parent, processTimeNs);
+                        if (slice != null) {
+                            ShmRef ref = region.write(SbeMessages.TEMPLATE_ALGO_SLICE_REF, slice.encode());
+                            out.sequenceId = pending.sequenceId;
+                            out.parentOrderId = slice.parentOrderId;
+                            out.sliceId = slice.sliceId;
+                            out.timestamp = slice.timestamp;
+                            out.ref = ref;
+                            outPub.offerBlocking(out.encode(), timeoutNs);
+                        }
+
+                        if (parent.leavesQuantity > 0) {
+                            activeParents.addLast(pending);
+                        }
                     }
                 }
+
+                stdHintSpin();
             }
         } catch (CrossProcessAeronIpcTransport.TimeoutException e) {
             throw new IllegalStateException("Algo service timed out under backpressure", e);
+        }
+    }
+
+    private static VwapMvpEngine.ParentOrder toParentOrder(SbeMessages.ParentOrderCommand cmd) {
+        VwapMvpEngine.ParentOrder order = new VwapMvpEngine.ParentOrder();
+        order.parentOrderId = cmd.parentOrderId;
+        order.symbolIndex = cmd.symbolIndex;
+        order.side = cmd.side == 0 ? Types.Side.BUY : Types.Side.SELL;
+        order.totalQuantity = cmd.totalQuantity;
+        order.leavesQuantity = cmd.totalQuantity;
+        order.basePrice = cmd.limitPrice;
+        order.startNs = cmd.startTime;
+        order.endNs = cmd.endTime;
+        order.tickStepNs = DEFAULT_TICK_STEP_NS;
+        order.numBuckets = cmd.numBuckets;
+        order.participationRate = cmd.participationRate;
+        order.maxSliceSize = cmd.maxSliceSize;
+        return order;
+    }
+
+    private static void stdHintSpin() {
+        Thread.onSpinWait();
+    }
+
+    private static final class PendingParent {
+        private final long sequenceId;
+        private final VwapMvpEngine.ParentOrder order;
+
+        private PendingParent(long sequenceId, VwapMvpEngine.ParentOrder order) {
+            this.sequenceId = sequenceId;
+            this.order = order;
         }
     }
 

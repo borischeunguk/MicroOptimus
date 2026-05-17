@@ -137,6 +137,16 @@ public final class CrossProcessAeronIpcTransport implements AutoCloseable {
             }
         }
 
+        public byte[] poll() {
+            int count = subscription.poll(handler, 1);
+            if (count > 0 && lastMessage != null) {
+                byte[] out = lastMessage;
+                lastMessage = null;
+                return out;
+            }
+            return null;
+        }
+
         @Override
         public void close() {
             subscription.close();
