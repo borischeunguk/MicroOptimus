@@ -25,6 +25,8 @@ const ORDER_END_TIME: u64 = 8_000_000; // matches Java endNs
 const PROCESS_TIME: u64 = ORDER_END_TIME - 1; // 7_999_999 — all buckets visible
 /// Number of child slices the VWAP engine emits per parent (= Java expectedChildrenPerParent).
 const EXPECTED_CHILDREN_PER_PARENT: u64 = 100;
+/// Empty-poll backoff: spin first for low-latency wakeups, then yield to reduce starvation.
+const EMPTY_POLL_SPIN_BUDGET: u32 = 128;
 /// Warmup parent orders sent before Criterion measurement begins (processes + Aeron warm-up).
 const WARMUP_PARENTS: u64 = 200;
 
@@ -322,19 +324,27 @@ fn run_one_parent(
     };
 
     let parent_start = Instant::now();
+    let mut publish_empty_polls: u32 = 0;
     while !cmd_pub.publish(&cmd.encode()) {
         assert_running("algo", algo);
         assert_running("sor", sor);
         if parent_start.elapsed() > hop_timeout() {
             panic!("timed out publishing parent command to Aeron");
         }
-        std::hint::spin_loop();
+        publish_empty_polls += 1;
+        if publish_empty_polls <= EMPTY_POLL_SPIN_BUDGET {
+            std::hint::spin_loop();
+        } else {
+            thread::yield_now();
+            publish_empty_polls = 0;
+        }
     }
 
     // Collect all EXPECTED_CHILDREN_PER_PARENT route events for this parent.
     // child_latency timer starts before polling (matches Java coordinator timing).
     for _ in 0..EXPECTED_CHILDREN_PER_PARENT {
         let child_start = Instant::now();
+        let mut route_empty_polls: u32 = 0;
         loop {
             if route_sub.poll().is_some() {
                 break;
@@ -344,7 +354,13 @@ fn run_one_parent(
             if parent_start.elapsed() > hop_timeout() {
                 panic!("timed out waiting for SOR route event from Aeron");
             }
-            std::hint::spin_loop();
+            route_empty_polls += 1;
+            if route_empty_polls <= EMPTY_POLL_SPIN_BUDGET {
+                std::hint::spin_loop();
+            } else {
+                thread::yield_now();
+                route_empty_polls = 0;
+            }
         }
         if let Some(h) = child_hist.as_deref_mut() {
             let _ = h.record(child_start.elapsed().as_nanos() as u64);
