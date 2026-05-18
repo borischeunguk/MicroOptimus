@@ -44,7 +44,7 @@ Run E2E JMH with the new router:
 
 ```bash
 cd /Users/xinyue/IdeaProjects/MicroOptimus
-./gradlew -p javamvp :sor:runE2ELatency --no-daemon -PjavamvpE2eSamples=1000 -Djavamvp.sor.router.impl=new
+./gradlew -p javamvp :sor:runE2ELatency --no-daemon -PjavamvpE2eSamples=100000 -Djavamvp.sor.router.impl=new
 ```
 
 
