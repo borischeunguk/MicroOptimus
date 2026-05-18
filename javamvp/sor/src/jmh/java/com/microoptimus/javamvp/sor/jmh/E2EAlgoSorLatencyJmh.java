@@ -46,6 +46,7 @@ public class E2EAlgoSorLatencyJmh {
     private long wallStart;
     private String aeronDir;
     private String mmapPath;
+    private String sorRouterImpl;
     private Process algoProcess;
     private Process sorProcess;
     private SbeMessages.ParentOrderCommand cmd;
@@ -56,6 +57,7 @@ public class E2EAlgoSorLatencyJmh {
         samples = Long.getLong("javamvp.e2e.samples", DEFAULT_SAMPLES);
         timeoutNs = Long.getLong("javamvp.e2e.timeout.ns", DEFAULT_TIMEOUT_NS);
         startupTimeoutNs = Long.getLong("javamvp.e2e.startup.timeout.ns", DEFAULT_STARTUP_TIMEOUT_NS);
+        sorRouterImpl = System.getProperty("javamvp.sor.router.impl", "mvp");
 
         cmd = new SbeMessages.ParentOrderCommand();
         cmd.clientId = 1;
@@ -157,6 +159,7 @@ public class E2EAlgoSorLatencyJmh {
             "-Djavamvp.e2e.mmap.path=" + mmapPath,
             "-Djavamvp.e2e.timeout.ns=" + timeoutNs,
             "-Djavamvp.e2e.startup.timeout.ns=" + startupTimeoutNs,
+            "-Djavamvp.sor.router.impl=" + sorRouterImpl,
             "-cp",
             classpath,
             mainClass);

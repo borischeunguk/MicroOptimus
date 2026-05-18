@@ -6,8 +6,13 @@ import com.microoptimus.javamvp.common.E2EIpcConfig;
 import com.microoptimus.javamvp.common.MmapSharedRegion;
 import com.microoptimus.javamvp.common.SbeMessages;
 import com.microoptimus.javamvp.common.ShmRef;
+import com.microoptimus.javamvp.common.Types;
+import com.microoptimus.javamvp.sor.cost.VenueFeeTable;
+import com.microoptimus.javamvp.sor.latency.VenueLatencyTelemetry;
+import com.microoptimus.javamvp.sor.md.SimulatedMarketDataService;
 
 import java.nio.file.Paths;
+import java.util.function.Function;
 
 public final class SorE2eServiceMain {
     private SorE2eServiceMain() {
@@ -18,11 +23,41 @@ public final class SorE2eServiceMain {
         String mmapPath = System.getProperty("javamvp.e2e.mmap.path", ".ipc/javamvp_mmap_jmh.dat");
         long timeoutNs = Long.getLong("javamvp.e2e.timeout.ns", E2EIpcConfig.DEFAULT_TIMEOUT_NS);
         long startupTimeoutNs = Long.getLong("javamvp.e2e.startup.timeout.ns", 60_000_000_000L);
+        String routerImpl = System.getProperty("javamvp.sor.router.impl", "mvp");
         if (aeronDir == null || aeronDir.isBlank()) {
             throw new IllegalArgumentException("Missing -Djavamvp.e2e.aeron.dir");
         }
 
-        SorMvpRouter router = new SorMvpRouter();
+        Function<SlicePayload, RouteDecisionPayload> routeFn;
+        if ("new".equalsIgnoreCase(routerImpl)) {
+            SimulatedMarketDataService marketData = new SimulatedMarketDataService();
+            VenueFeeTable feeTable = new VenueFeeTable();
+            VenueLatencyTelemetry latencyTelemetry = new VenueLatencyTelemetry();
+            // Static TOB snapshot for benchmark symbols; stale is disabled for deterministic E2E runs.
+            long now = System.nanoTime();
+            for (int symbol = 1; symbol <= 16; symbol++) {
+                marketData.update(symbol, Types.VenueId.CBOE, 100.00, 1200, 100.02, 1000, now);
+                marketData.update(symbol, Types.VenueId.NASQ, 100.01, 1400, 100.01, 1400, now);
+                marketData.update(symbol, Types.VenueId.NYSE, 99.99, 1000, 100.03, 900, now);
+            }
+            SorRouter router = new SorRouter(
+                marketData,
+                feeTable,
+                latencyTelemetry,
+                1.0,
+                0.20,
+                0.01,
+                0.05,
+                Long.MAX_VALUE
+            );
+            routeFn = router::route;
+        } else if ("mvp".equalsIgnoreCase(routerImpl)) {
+            SorMvpRouter router = new SorMvpRouter();
+            routeFn = router::route;
+        } else {
+            throw new IllegalArgumentException("Unsupported -Djavamvp.sor.router.impl=" + routerImpl + " (expected: mvp|new)");
+        }
+
         SbeMessages.SorRouteRefEvent out = new SbeMessages.SorRouteRefEvent();
         SbeMessages.ControlMessage ctrl = new SbeMessages.ControlMessage();
         MmapSharedRegion region = new MmapSharedRegion(Paths.get(mmapPath), 1, 8 * 1024 * 1024);
@@ -51,7 +86,7 @@ public final class SorE2eServiceMain {
 
                 SlicePayload slice = SlicePayload.decode(region.read(evt.ref));
                 long routeStart = System.nanoTime();
-                RouteDecisionPayload decision = router.route(slice);
+                RouteDecisionPayload decision = routeFn.apply(slice);
                 decision.processingLatencyNs = System.nanoTime() - routeStart;
 
                 ShmRef ref = region.write(SbeMessages.TEMPLATE_SOR_ROUTE_REF, decision.encode());

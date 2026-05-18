@@ -36,4 +36,15 @@ cd /Users/xinyue/IdeaProjects/MicroOptimus/javamvp
 ./gradlew :sor:runSorRouterDemo
 ```
 
+## E2E JMH with SorRouter
+
+`SorE2eServiceMain` supports `-Djavamvp.sor.router.impl=mvp|new` (`mvp` default).
+
+Run E2E JMH with the new router:
+
+```bash
+cd /Users/xinyue/IdeaProjects/MicroOptimus
+./gradlew -p javamvp :sor:runE2ELatency --no-daemon -PjavamvpE2eSamples=1000 -Djavamvp.sor.router.impl=new
+```
+
 
