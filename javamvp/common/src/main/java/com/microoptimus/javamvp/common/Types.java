@@ -11,7 +11,9 @@ public final class Types {
     public enum VenueId {
         INTERNAL,
         CME,
-        NASQ
+        NASQ,
+        CBOE,
+        NYSE
     }
 }
 
