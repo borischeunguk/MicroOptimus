@@ -106,6 +106,7 @@ impl AeronChannelConfig {
 pub const STREAM_PARENT_CMD: i32 = 9;
 pub const STREAM_ALGO_SLICE: i32 = 10;
 pub const STREAM_SOR_ROUTE: i32 = 11;
+pub const STREAM_MARKET_DATA: i32 = 12;
 pub const AERON_DIR_ENV: &str = "MO_AERON_DIR";
 
 #[cfg(feature = "aeron")]

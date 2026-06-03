@@ -92,6 +92,31 @@ impl FixedCodec for SorRouteRefEvent {
     }
 }
 
+/// Market data tick published by an external feed or synthetic generator.
+///
+/// Fixed-size, `#[repr(C)]` for zero-copy Aeron transport.
+/// Slot layout in `MarketDataRegion`:
+///   bytes [0..8]  = seqlock version counter (u64)
+///   bytes [8..64] = MarketDataUpdate (56 bytes)  → exactly one cache line per symbol
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Default)]
+pub struct MarketDataUpdate {
+    pub symbol_index: u32,
+    pub _pad: u32,
+    pub bid_price: u64,
+    pub ask_price: u64,
+    pub last_price: u64,
+    pub bid_size: u64,
+    pub ask_size: u64,
+    pub timestamp: u64,
+}
+
+impl FixedCodec for MarketDataUpdate {
+    fn template_id() -> SbeTemplateId {
+        SbeTemplateId::MarketDataUpdate
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

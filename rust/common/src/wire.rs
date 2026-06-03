@@ -19,6 +19,7 @@ pub enum SbeTemplateId {
     ParentOrderCommand = 1,
     AlgoSliceRefEvent = 2,
     SorRouteRefEvent = 3,
+    MarketDataUpdate = 4,
 }
 
 #[repr(C)]

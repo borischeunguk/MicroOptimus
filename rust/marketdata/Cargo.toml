@@ -1,0 +1,15 @@
+[package]
+name = "marketdata"
+version.workspace = true
+edition.workspace = true
+
+[features]
+aeron-integration = ["common/aeron"]
+
+[dependencies]
+common = { path = "../common" }
+
+[[bin]]
+name = "marketdata_aeron_service"
+required-features = ["aeron-integration"]
+

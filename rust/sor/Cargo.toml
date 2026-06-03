@@ -11,6 +11,7 @@ aeron-integration = ["common/aeron"]
 
 [dev-dependencies]
 algo = { path = "../algo" }
+marketdata = { path = "../marketdata" }
 criterion = "0.5"
 hdrhistogram = "7"
 serde = { version = "1", features = ["derive"] }
@@ -23,6 +24,11 @@ required-features = ["aeron-integration"]
 
 [[bench]]
 name = "e2e_algo_sor_latency"
+harness = false
+required-features = ["aeron-integration"]
+
+[[bench]]
+name = "e2e_algo_sor_marketdata_latency"
 harness = false
 required-features = ["aeron-integration"]
 

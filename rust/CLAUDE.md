@@ -50,4 +50,9 @@ This Rust code must follow the same performance principles as the parent project
 - **Zero allocation in hot paths** — use object pooling, stack allocation, or arena allocators
 - **Lock-free data structures** — prefer `crossbeam`, `parking_lot`, or atomic primitives
 - **Zero-copy** — use shared memory and binary encoding (SBE-compatible) for IPC with Java/C++ components
-- **Target latencies** — sub-500ns for matching and routing operations
+- **Target latencies** — sub-1000ns for matching and routing operations
+
+## Implementation Principles
+- **Keep it simple**  
+- **Keep changes minimum** 
+- **Fail fast and explicit** 

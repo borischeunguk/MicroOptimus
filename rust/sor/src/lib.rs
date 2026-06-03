@@ -1,7 +1,9 @@
 pub mod cluster_service;
+pub mod cluster_service_md;
 pub mod order_request;
 pub mod risk;
 pub mod router;
+pub mod router_marketdata;
 pub mod scorer;
 pub mod sor_service;
 pub mod splitter;
