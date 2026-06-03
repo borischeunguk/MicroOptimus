@@ -1,0 +1,15 @@
+{
+  "bench": "e2e_algo_sor_marketdata_latency",
+  "scenario": "e2e_s1_steady",
+  "samples": 10000,
+  "children_per_parent": 100,
+  "total_children": 1000000,
+  "parent_latency_ns_p90": 54623,
+  "parent_latency_ns_p99": 98559,
+  "parent_latency_ns_p999": 173823,
+  "child_latency_ns_p90": 311,
+  "child_latency_ns_p99": 1993,
+  "child_latency_ns_p999": 3739,
+  "throughput_parent_per_sec": 30603.98731760972,
+  "throughput_child_per_sec": 3060398.731760972
+}
