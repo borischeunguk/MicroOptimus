@@ -6,6 +6,8 @@ use crate::risk::{RiskCheckResult, RiskManager};
 use crate::router::RoutingDecision;
 use crate::venue::VenueConfig;
 
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
+
 /// Scoring weights for the market-data-aware combined score.
 ///
 /// `price + latency + fees` weights must not necessarily sum to 1.0;
@@ -88,6 +90,14 @@ pub struct MarketDataRouter {
     pub rejected_orders: u64,
 }
 
+#[inline]
+fn epoch_ns() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("time went backwards")
+        .as_nanos()
+}
+
 impl MarketDataRouter {
     /// Construct with default venue parameters and scoring weights.
     pub fn new(md_region: MarketDataRegion) -> Self {
@@ -134,6 +144,10 @@ impl MarketDataRouter {
     ///
     /// Every call reads from `md_region` — no caching.
     pub fn route_order(&mut self, request: &OrderRequest) -> RoutingDecision {
+        let start_wall_ns = epoch_ns();
+        let start = Instant::now();
+        eprintln!("Routing order {} (qty {}) for symbol {} request timestamp {} current timestamp {}",
+            request.order_id, request.quantity, request.symbol_index, request.timestamp,  start_wall_ns);
         if !self.initialized {
             return RoutingDecision::rejected(request.order_id, "MarketDataRouter not initialized");
         }
@@ -175,6 +189,10 @@ impl MarketDataRouter {
         }
 
         self.external_routes += 1;
+        let end_wall_ns = epoch_ns();
+        let dur_ns = start.elapsed().as_nanos();
+        eprintln!("Routing order {} (qty {}) for symbol {} request timestamp {} end timestamp {} duration {}",
+                  request.order_id, request.quantity, request.symbol_index, request.timestamp,  end_wall_ns, dur_ns );
         RoutingDecision::external(request.order_id, best_venue, request.quantity)
     }
 

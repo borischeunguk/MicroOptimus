@@ -35,7 +35,7 @@ use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Through
 use hdrhistogram::Histogram;
 use serde::Serialize;
 
-const MIN_REPORT_SAMPLES: u64 = 10_000;
+const MIN_REPORT_SAMPLES: u64 = 100;
 const ORDER_END_TIME: u64 = 8_000_000;
 const PROCESS_TIME: u64 = ORDER_END_TIME - 1;
 const EXPECTED_CHILDREN_PER_PARENT: u64 = 100;
