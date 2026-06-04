@@ -171,6 +171,8 @@ impl MarketDataRouter {
 
         // 3. Read fresh market-data snapshot (unconditional, no caching)
         let snap = self.md_region.try_read_snapshot(request.symbol_index as usize);
+        eprintln!("Snapshot for symbol {}: {:?}",
+            request.symbol_index, snap.as_ref().map(|s| (s.bid_price, s.ask_price)));
 
         // 4. Score each enabled external venue
         let is_buy = matches!(request.side, common::types::Side::Buy);
