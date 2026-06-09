@@ -14,7 +14,6 @@
 #[cfg(feature = "aeron-integration")]
 mod enabled {
     use std::env;
-
     use common::cluster::{AeronClusterSubscriber, ClusterSubscriber};
     use common::sbe::{FixedCodec, MarketDataUpdate};
     use common::shm::{MarketDataRegion, MD_MAX_SYMBOLS};

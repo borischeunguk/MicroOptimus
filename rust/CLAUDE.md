@@ -2,6 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Implementation Principles
+- **Keep it simple**
+- **Keep changes minimum**
+- **Fail fast and explicit**
+
 ## Overview
 
 MVP / POC version of the Rust module for MicroOptimus. This Rust code will only implement core components of the trading system. 
@@ -51,8 +56,3 @@ This Rust code must follow the same performance principles as the parent project
 - **Lock-free data structures** — prefer `crossbeam`, `parking_lot`, or atomic primitives
 - **Zero-copy** — use shared memory and binary encoding (SBE-compatible) for IPC with Java/C++ components
 - **Target latencies** — sub-1000ns for matching and routing operations
-
-## Implementation Principles
-- **Keep it simple**  
-- **Keep changes minimum** 
-- **Fail fast and explicit** 

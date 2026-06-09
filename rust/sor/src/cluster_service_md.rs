@@ -59,6 +59,12 @@ impl<S: ClusterSubscriber, P: ClusterPublisher> SorMdClusterService<S, P> {
                 timestamp: slice_msg.timestamp,
             };
 
+            // Capture wall-clock ns before routing so the bench can compute true child latency.
+            let send_timestamp_ns = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("time went backwards")
+                .as_nanos() as u64;
+
             // route_order reads a fresh MD snapshot on every call
             let decision = self.router.route_order(&request);
 
@@ -106,6 +112,7 @@ impl<S: ClusterSubscriber, P: ClusterPublisher> SorMdClusterService<S, P> {
                 slice_id: slice_ref_event.slice_id,
                 route_id: decision.order_id,
                 timestamp: request.timestamp,
+                send_timestamp_ns,
                 shm_ref,
             };
             self.route_seq += 1;

@@ -104,6 +104,7 @@ impl<S: ClusterSubscriber, P: ClusterPublisher> SorClusterService<S, P> {
                 slice_id: slice_ref_event.slice_id,
                 route_id: decision.order_id,
                 timestamp: request.timestamp,
+                send_timestamp_ns: 0,
                 shm_ref,
             };
             self.route_seq += 1;

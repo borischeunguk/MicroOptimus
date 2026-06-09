@@ -83,6 +83,9 @@ pub struct SorRouteRefEvent {
     pub slice_id: u64,
     pub route_id: u64,
     pub timestamp: u64,
+    /// Wall-clock nanoseconds (UNIX epoch) captured by the SOR just before calling route_order.
+    /// Zero when not set (non-MD path). Used by the bench to compute true per-child routing latency.
+    pub send_timestamp_ns: u64,
     pub shm_ref: ShmRef,
 }
 
