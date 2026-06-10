@@ -29,7 +29,7 @@ use common::cluster::{
     ClusterSubscriber, AERON_DIR_ENV, STREAM_ALGO_SLICE, STREAM_MARKET_DATA, STREAM_PARENT_CMD,
     STREAM_SOR_ROUTE,
 };
-use common::sbe::{FixedCodec, MarketDataUpdate, ParentOrderCommand, SorRouteRefEvent};
+use common::sbe::{FixedCodec, MarketDataUpdate, ParentOrderCommand};
 use common::shm::{MarketDataRegion, SharedRegion, MD_MAX_SYMBOLS};
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use hdrhistogram::Histogram;
@@ -282,15 +282,6 @@ fn spawn_sor_md_process(
         .expect("failed to spawn sor-marketdata service")
 }
 
-/// Wall-clock nanoseconds since UNIX epoch, matching what the SOR service stamps on each event.
-#[inline]
-fn wall_ns() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("time went backwards")
-        .as_nanos() as u64
-}
-
 /// xorshift64 PRNG: deterministic, allocation-free jitter for tick prices.
 #[inline]
 fn jitter_price(seq: u64, base: u64) -> (u64, u64) {
@@ -374,14 +365,12 @@ fn run_one_parent_with_md(
     }
 
     // 3. Collect all expected child route events.
-    //    Child latency = wall_ns() at coordinator receive - send_timestamp_ns stamped by SOR
-    //    before route_order. This is independent of batching and captures the true per-child
-    //    routing latency (MD snapshot read + scoring + Aeron deliver).
     for _ in 0..EXPECTED_CHILDREN_PER_PARENT {
+        let child_start = Instant::now();
         let mut route_spins: u32 = 0;
-        let bytes = loop {
-            if let Some(b) = route_sub.poll() {
-                break b;
+        loop {
+            if route_sub.poll().is_some() {
+                break;
             }
             assert_running("algo", algo);
             assert_running("sor", sor);
@@ -396,14 +385,9 @@ fn run_one_parent_with_md(
                 thread::yield_now();
                 route_spins = 0;
             }
-        };
+        }
         if let Some(h) = child_hist.as_deref_mut() {
-            let receive_ns = wall_ns();
-            let latency = SorRouteRefEvent::decode(&bytes)
-                .filter(|evt| evt.send_timestamp_ns > 0)
-                .map(|evt| receive_ns.saturating_sub(evt.send_timestamp_ns))
-                .unwrap_or(0);
-            let _ = h.record(latency);
+            let _ = h.record(child_start.elapsed().as_nanos() as u64);
         }
     }
 
