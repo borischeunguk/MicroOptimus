@@ -4,12 +4,12 @@
   "samples": 10000,
   "children_per_parent": 100,
   "total_children": 1000000,
-  "parent_latency_ns_p90": 54623,
-  "parent_latency_ns_p99": 98559,
-  "parent_latency_ns_p999": 173823,
-  "child_latency_ns_p90": 311,
-  "child_latency_ns_p99": 1993,
-  "child_latency_ns_p999": 3739,
-  "throughput_parent_per_sec": 30603.98731760972,
-  "throughput_child_per_sec": 3060398.731760972
+  "parent_latency_ns_p90": 39199,
+  "parent_latency_ns_p99": 110655,
+  "parent_latency_ns_p999": 248319,
+  "child_latency_ns_p90": 297,
+  "child_latency_ns_p99": 2097,
+  "child_latency_ns_p999": 3893,
+  "throughput_parent_per_sec": 29831.444522608796,
+  "throughput_child_per_sec": 2983144.4522608793
 }
