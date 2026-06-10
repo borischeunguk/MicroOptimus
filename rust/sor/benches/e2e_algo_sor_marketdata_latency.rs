@@ -256,6 +256,9 @@ fn spawn_marketdata_process(
         .env("MO_MARKET_DATA_STREAM", md_stream.to_string())
         .env("MO_MD_SHM_PATH", md_shm_path)
         .env("MO_MD_SHM_CAPACITY", MD_MAX_SYMBOLS.to_string())
+        .env("MO_MD_SYNTHETIC_ENABLE", "1")
+        .env("MO_MD_SYNTHETIC_SYMBOL", "0")
+        .env("MO_MD_SYNTHETIC_BASE_PRICE", "1500")
         .spawn()
         .expect("failed to spawn marketdata service")
 }
