@@ -5,6 +5,7 @@ edition.workspace = true
 
 [features]
 aeron-integration = ["common/aeron"]
+chronicle-integration = ["common/chronicle"]
 
 [dependencies]
 common = { path = "../common" }
@@ -19,4 +20,12 @@ serde_json = "1"
 name = "vwap_latency"
 harness = false
 required-features = ["aeron-integration"]
+
+[[bin]]
+name = "algo_aeron_service"
+required-features = ["aeron-integration"]
+
+[[bin]]
+name = "algo_chronicle_service"
+required-features = ["chronicle-integration"]
 

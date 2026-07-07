@@ -5,6 +5,7 @@ edition.workspace = true
 
 [features]
 aeron-integration = ["common/aeron"]
+chronicle-integration = ["common/chronicle"]
 
 [dependencies]
 common = { path = "../common" }
@@ -12,4 +13,8 @@ common = { path = "../common" }
 [[bin]]
 name = "marketdata_aeron_service"
 required-features = ["aeron-integration"]
+
+[[bin]]
+name = "marketdata_chronicle_service"
+required-features = ["chronicle-integration"]
 

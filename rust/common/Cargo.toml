@@ -5,6 +5,7 @@ edition.workspace = true
 
 [features]
 aeron = ["dep:rusteron-client", "dep:rusteron-media-driver"]
+chronicle = []
 
 [dependencies]
 memmap2.workspace = true

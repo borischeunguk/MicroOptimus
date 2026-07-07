@@ -4,6 +4,25 @@ This Rust workspace now supports both:
 
 - in-memory cluster topic (default fast test mode)
 - real Aeron IPC via `rusteron-client` + embedded Aeron C media driver (feature-gated)
+- Chronicle-queue-like mmap transport adapters behind `chronicle-integration`
+
+## Chronicle baseline (strict guards)
+
+- Pinned compatibility target: `net.openhft:chronicle-queue:5.27ea`
+- Rust module path: `common::chronicle_cluster` and `common::chronicle_queue`
+- Queue topology: one file per stream (`parent_cmd.cq4`, `algo_slice.cq4`, `sor_route.cq4`, `market_data.cq4`)
+- Fail-fast policy: reject unsupported version, roll-cycle, and wire-type at queue-open boundary
+
+### Constructor swap example (Aeron -> Chronicle)
+
+```rust
+// before (Aeron)
+let mut cmd_pub = AeronClusterPublisher::new("aeron:ipc", parent_cmd_stream)?;
+
+// after (Chronicle)
+let cfg = ChronicleClusterConfig::new("/tmp/mo_chronicle", parent_cmd_stream, 64 << 20);
+let mut cmd_pub = ChronicleClusterPublisher::create(&cfg)?;
+```
 
 ## Design
 
@@ -48,6 +67,19 @@ MO_BENCH_SAMPLES=100000 MO_BENCH_WARMUP_SECS=2 MO_BENCH_MEASUREMENT_SECS=5 MO_BE
 # Processes are spawned once per scenario (matches Java @Setup(Level.Trial)).
 # Estimated runtime: ~7 minutes (10 Criterion samples × ~44s/sample).
 MO_BENCH_SAMPLES=100000 MO_BENCH_CRITERION_SAMPLE_SIZE=10 MO_BENCH_MEASUREMENT_SECS=3500 MO_BENCH_HOP_TIMEOUT_SECS=600 cargo bench -p sor --bench e2e_algo_sor_latency --features aeron-integration -- e2e_s1_steady
+
+MO_BENCH_MD_SAMPLES=10000 \
+   MO_BENCH_MD_CRITERION_SAMPLE_SIZE=10 \
+   MO_BENCH_MD_MEASUREMENT_SECS=300 \
+   MO_BENCH_MD_HOP_TIMEOUT_SECS=60 \
+   cargo bench -p sor --bench e2e_algo_sor_marketdata_latency --features aeron-integration -- e2e_s1_steady
+
+# Chronicle E2E algo->SOR marketdata latency (same scenario key)
+MO_BENCH_CHRONICLE_MD_SAMPLES=10000 \
+   MO_BENCH_CHRONICLE_MD_CRITERION_SAMPLE_SIZE=10 \
+   MO_BENCH_CHRONICLE_MD_MEASUREMENT_SECS=300 \
+   MO_BENCH_CHRONICLE_MD_HOP_TIMEOUT_SECS=60 \
+   cargo bench -p sor --bench e2e_algo_sor_chronicle_marketdata_latency --features chronicle-integration -- e2e_s1_steady
 ```
 Find and kill any leftover service processes after the benchmarks:
 
@@ -61,6 +93,7 @@ Reports (overwritten in-place):
 - `algo/perf-reports/rust_aeron_vwap_latency_algo_s1_steady.json`
 - `sor/perf-reports/rust_aeron_router_latency_sor_s1_steady.json`
 - `sor/perf-reports/rust_aeron_e2e_algo_sor_latency_e2e_s1_steady.json`
+- `sor/perf-reports/rust_chronicle_e2e_algo_sor_marketdata_latency_e2e_s1_steady.json`
 
 E2E tests:
 

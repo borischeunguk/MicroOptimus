@@ -1,4 +1,8 @@
 pub mod cluster;
+#[cfg(feature = "chronicle")]
+pub mod chronicle_cluster;
+#[cfg(feature = "chronicle")]
+pub mod chronicle_queue;
 pub mod ipc;
 pub mod messages;
 pub mod pool;

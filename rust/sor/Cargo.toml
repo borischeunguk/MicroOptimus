@@ -8,6 +8,7 @@ common = { path = "../common" }
 
 [features]
 aeron-integration = ["common/aeron"]
+chronicle-integration = ["common/chronicle"]
 
 [dev-dependencies]
 algo = { path = "../algo" }
@@ -31,4 +32,21 @@ required-features = ["aeron-integration"]
 name = "e2e_algo_sor_marketdata_latency"
 harness = false
 required-features = ["aeron-integration"]
+
+[[bench]]
+name = "e2e_algo_sor_chronicle_marketdata_latency"
+harness = false
+required-features = ["chronicle-integration"]
+
+[[bin]]
+name = "sor_aeron_service"
+required-features = ["aeron-integration"]
+
+[[bin]]
+name = "sor_marketdata_aeron_service"
+required-features = ["aeron-integration"]
+
+[[bin]]
+name = "sor_marketdata_chronicle_service"
+required-features = ["chronicle-integration"]
 
