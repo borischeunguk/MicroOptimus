@@ -8,8 +8,23 @@ Criterion benchmarks are provided for SOR-only and end-to-end algo+SOR latency.
 
 - SOR-only benchmark: `benches/router_latency.rs`
 - End-to-end benchmark: `benches/e2e_algo_sor_latency.rs`
+- End-to-end chronicle + market-data benchmark: `benches/e2e_algo_sor_chronicle_marketdata_latency.rs`
 - Report output: `perf-reports/rust_aeron_*.json`
 - Metrics include p90/p99/p99.9 latency and throughput for both parent orders and child slices.
+
+### Chronicle market-data benchmark (10k)
+
+This benchmark spawns `marketdata_chronicle_service` with synthetic snapshots disabled
+(`MO_MD_SYNTHETIC_ENABLE=0`) so only coordinator-published ticks update `MarketDataRegion`.
+
+```bash
+cd /Users/xinyue/IdeaProjects/MicroOptimus/rust
+MO_BENCH_CHRONICLE_MD_SAMPLES=10000 \
+  MO_BENCH_CHRONICLE_MD_CRITERION_SAMPLE_SIZE=10 \
+  MO_BENCH_CHRONICLE_MD_MEASUREMENT_SECS=300 \
+  MO_BENCH_CHRONICLE_MD_HOP_TIMEOUT_SECS=60 \
+  cargo bench -p sor --bench e2e_algo_sor_chronicle_marketdata_latency --features chronicle-integration -- e2e_s1_steady
+```
 
 ## E2E benchmark design
 

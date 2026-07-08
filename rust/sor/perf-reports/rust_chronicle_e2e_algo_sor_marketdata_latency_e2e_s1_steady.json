@@ -1,15 +1,15 @@
 {
   "bench": "e2e_algo_sor_chronicle_marketdata_latency",
   "scenario": "e2e_s1_steady",
-  "samples": 200,
+  "samples": 10000,
   "children_per_parent": 100,
-  "total_children": 20000,
-  "parent_latency_ns_p90": 37951,
-  "parent_latency_ns_p99": 172287,
-  "parent_latency_ns_p999": 595967,
-  "child_latency_ns_p90": 1875,
-  "child_latency_ns_p99": 1947,
-  "child_latency_ns_p999": 2649,
-  "throughput_parent_per_sec": 23715.773099815182,
-  "throughput_child_per_sec": 2371577.309981518
+  "total_children": 1000000,
+  "parent_latency_ns_p90": 35935,
+  "parent_latency_ns_p99": 76863,
+  "parent_latency_ns_p999": 559103,
+  "child_latency_ns_p90": 142,
+  "child_latency_ns_p99": 1955,
+  "child_latency_ns_p999": 2747,
+  "throughput_parent_per_sec": 31268.012622659062,
+  "throughput_child_per_sec": 3126801.262265906
 }

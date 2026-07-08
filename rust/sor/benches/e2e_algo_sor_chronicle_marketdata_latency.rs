@@ -261,7 +261,8 @@ fn spawn_marketdata_process(
         .env("MO_CHRONICLE_QUEUE_CAPACITY", DEFAULT_QUEUE_CAPACITY.to_string())
         .env("MO_MD_SHM_PATH", md_shm_path)
         .env("MO_MD_SHM_CAPACITY", MD_MAX_SYMBOLS.to_string())
-        .env("MO_MD_SYNTHETIC_ENABLE", "1")
+        // Benchmark should measure coordinator-published market-data ticks only.
+        .env("MO_MD_SYNTHETIC_ENABLE", "0")
         .env("MO_MD_SYNTHETIC_SYMBOL", "0")
         .env("MO_MD_SYNTHETIC_BASE_PRICE", "1500")
         .spawn()

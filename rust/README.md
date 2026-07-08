@@ -75,6 +75,9 @@ MO_BENCH_MD_SAMPLES=10000 \
    cargo bench -p sor --bench e2e_algo_sor_marketdata_latency --features aeron-integration -- e2e_s1_steady
 
 # Chronicle E2E algo->SOR marketdata latency (same scenario key)
+# Note: synthetic market-data generation is disabled in this bench
+# (`MO_MD_SYNTHETIC_ENABLE=0` inside the spawned `marketdata_chronicle_service`),
+# so only coordinator-published ticks drive MD snapshots.
 MO_BENCH_CHRONICLE_MD_SAMPLES=10000 \
    MO_BENCH_CHRONICLE_MD_CRITERION_SAMPLE_SIZE=10 \
    MO_BENCH_CHRONICLE_MD_MEASUREMENT_SECS=300 \
